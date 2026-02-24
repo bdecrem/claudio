@@ -1,0 +1,10 @@
+{
+  "name": "claudio-web",
+  "private": true,
+  "scripts": {
+    "start": "serve -s . -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  }
+}

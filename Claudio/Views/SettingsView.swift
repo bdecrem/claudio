@@ -5,8 +5,9 @@ struct SettingsView: View {
     let chatService: ChatService
 
     @State private var isFetching = false
-    @State private var isAddingServer = false
-    @State private var newServerURL = ""
+    @State private var editingIndex: Int?
+    @State private var editURL = ""
+    @State private var editToken = ""
 
     var body: some View {
         NavigationStack {
@@ -14,28 +15,28 @@ struct SettingsView: View {
                 // MARK: - Servers
                 Section {
                     ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
-                        let isActive = server == chatService.serverAddress
+                        let isActive = index == chatService.activeServerIndex
 
                         Button {
                             if !isActive {
-                                isFetching = true
-                                chatService.switchServer(to: server)
-                                Task {
-                                    await chatService.fetchAgents()
-                                    isFetching = false
-                                }
+                                chatService.switchServer(to: index)
                             }
                         } label: {
                             HStack(spacing: Theme.spacing * 1.5) {
-                                // Connection dot
                                 Circle()
                                     .fill(isActive ? Color.green : Theme.textSecondary.opacity(0.3))
                                     .frame(width: 7, height: 7)
 
-                                Text(displayName(for: server))
-                                    .font(Theme.body)
-                                    .foregroundStyle(isActive ? Theme.textPrimary : Theme.textSecondary)
-                                    .lineLimit(1)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(displayName(for: server.url))
+                                        .font(Theme.body)
+                                        .foregroundStyle(isActive ? Theme.textPrimary : Theme.textSecondary)
+                                        .lineLimit(1)
+
+                                    Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
+                                        .font(Theme.caption)
+                                        .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                                }
 
                                 Spacer()
 
@@ -55,60 +56,33 @@ struct SettingsView: View {
                                     Label("Remove", systemImage: "trash")
                                 }
                             }
-                        }
-                    }
-
-                    // Add server — inline
-                    if isAddingServer {
-                        HStack(spacing: Theme.spacing) {
-                            TextField("https://...", text: $newServerURL)
-                                .font(Theme.body)
-                                .textContentType(.URL)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .onSubmit { commitNewServer() }
-
                             Button {
-                                commitNewServer()
+                                editingIndex = index
+                                editURL = server.url
+                                editToken = server.token
                             } label: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(
-                                        newServerURL.trimmingCharacters(in: .whitespaces).isEmpty
-                                            ? Theme.textSecondary.opacity(0.3)
-                                            : Theme.accent
-                                    )
+                                Label("Edit", systemImage: "pencil")
                             }
-                            .disabled(newServerURL.trimmingCharacters(in: .whitespaces).isEmpty)
-
-                            Button {
-                                isAddingServer = false
-                                newServerURL = ""
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
+                            .tint(Theme.accent)
                         }
-                        .listRowBackground(Theme.surface)
                     }
                 } header: {
                     HStack {
-                        Text("Server")
+                        Text("Servers")
                         Spacer()
-                        if !isAddingServer {
-                            Button {
-                                isAddingServer = true
-                            } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
+                        Button {
+                            editingIndex = -1  // -1 = adding new
+                            editURL = ""
+                            editToken = ""
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Theme.textSecondary)
                         }
                     }
                 } footer: {
                     if chatService.savedServers.count > 1 {
-                        Text("Swipe to remove inactive servers.")
+                        Text("Swipe to edit or remove.")
                             .font(Theme.caption)
                     }
                 }
@@ -120,7 +94,10 @@ struct SettingsView: View {
                             Button {
                                 chatService.selectedAgent = agent.id
                             } label: {
-                                HStack {
+                                HStack(spacing: Theme.spacing) {
+                                    if let emoji = agent.emoji {
+                                        Text(emoji)
+                                    }
                                     Text(agent.name)
                                         .font(Theme.body)
                                         .foregroundStyle(Theme.textPrimary)
@@ -157,19 +134,21 @@ struct SettingsView: View {
                     } header: {
                         Text("Agent")
                     } footer: {
-                        Text("Couldn't reach server. Enter a name manually.")
+                        Text(chatService.connectionError ?? "Couldn't reach server.")
                             .font(Theme.caption)
                     }
                 }
 
-                // MARK: - Danger zone
-                Section {
-                    Button("Clear Conversation") {
-                        chatService.clearMessages()
-                        dismiss()
+                // MARK: - Clear
+                if !chatService.messages.isEmpty {
+                    Section {
+                        Button("Clear Conversation") {
+                            chatService.clearMessages()
+                            dismiss()
+                        }
+                        .foregroundStyle(.red)
+                        .listRowBackground(Theme.surface)
                     }
-                    .foregroundStyle(.red)
-                    .listRowBackground(Theme.surface)
                 }
             }
             .scrollContentBackground(.hidden)
@@ -183,9 +162,31 @@ struct SettingsView: View {
                 }
             }
             .foregroundStyle(Theme.textPrimary)
+            .sheet(item: $editingIndex) { index in
+                ServerEditSheet(
+                    isNew: index == -1,
+                    url: $editURL,
+                    token: $editToken,
+                    isFetching: $isFetching,
+                    onSave: {
+                        if index == -1 {
+                            chatService.addServer(url: editURL, token: editToken)
+                        } else {
+                            chatService.updateServer(at: index, url: editURL, token: editToken)
+                        }
+                        isFetching = true
+                        Task {
+                            await chatService.fetchAgents()
+                            isFetching = false
+                        }
+                        editingIndex = nil
+                    },
+                    onCancel: { editingIndex = nil }
+                )
+            }
         }
         .onAppear {
-            if chatService.agents.isEmpty {
+            if chatService.hasServer && chatService.agents.isEmpty {
                 isFetching = true
                 Task {
                     await chatService.fetchAgents()
@@ -196,18 +197,78 @@ struct SettingsView: View {
         .preferredColorScheme(.dark)
     }
 
-    private func commitNewServer() {
-        chatService.addServer(newServerURL)
-        newServerURL = ""
-        isAddingServer = false
-    }
-
-    /// Strip protocol for display — show the hostname
     private func displayName(for url: String) -> String {
         var name = url
         for prefix in ["https://", "http://"] {
             if name.hasPrefix(prefix) { name = String(name.dropFirst(prefix.count)) }
         }
         return name
+    }
+}
+
+// Make Int work with .sheet(item:)
+extension Int: @retroactive Identifiable {
+    public var id: Int { self }
+}
+
+// MARK: - Server Edit Sheet
+
+private struct ServerEditSheet: View {
+    let isNew: Bool
+    @Binding var url: String
+    @Binding var token: String
+    @Binding var isFetching: Bool
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Server URL")
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                        TextField("https://your-server.ngrok.io", text: $url)
+                            .font(Theme.body)
+                            .textContentType(.URL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    .listRowBackground(Theme.surface)
+
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Token")
+                            .font(Theme.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                        SecureField("Bearer token", text: $token)
+                            .font(Theme.body)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    .listRowBackground(Theme.surface)
+                } footer: {
+                    Text("Your server token authenticates all requests.")
+                        .font(Theme.caption)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .navigationTitle(isNew ? "Add Server" : "Edit Server")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel", action: onCancel)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save", action: onSave)
+                        .foregroundStyle(Theme.accent)
+                        .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .foregroundStyle(Theme.textPrimary)
+        }
+        .preferredColorScheme(.dark)
     }
 }

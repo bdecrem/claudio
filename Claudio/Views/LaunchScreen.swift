@@ -3,14 +3,12 @@ import SwiftUI
 struct LaunchScreen: View {
     var body: some View {
         ZStack {
-            // Background matching the icon: deep warm dark
-            Color(hex: "180C08")
+            Color(hex: "110604")
                 .ignoresSafeArea()
 
             VStack(spacing: 28) {
-                // The character — rendered as SwiftUI shapes matching the SVG
-                ClaudioIcon()
-                    .frame(width: 120, height: 120)
+                ClaudioCharacter()
+                    .frame(width: 148, height: 165)
 
                 Text("Claudio")
                     .font(.system(size: 36, weight: .bold, design: .serif))
@@ -18,8 +16,8 @@ struct LaunchScreen: View {
                         LinearGradient(
                             colors: [
                                 Color(hex: "D4856A"),
-                                Color(hex: "B85C45"),
-                                Color(hex: "8C3A2A")
+                                Color(hex: "B05238"),
+                                Color(hex: "8C3020")
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -35,63 +33,98 @@ struct LaunchScreen: View {
     }
 }
 
-// SwiftUI recreation of the mascot icon
-private struct ClaudioIcon: View {
+/// v3 character: antennae, arms, legs, dark eyes with amber catchlights
+private struct ClaudioCharacter: View {
     var body: some View {
         Canvas { context, size in
-            let scale = size.width / 120
+            let sx = size.width / 148
+            let sy = size.height / 165
 
-            // Background
-            let bgRect = CGRect(origin: .zero, size: size)
-            context.fill(Path(bgRect), with: .linearGradient(
-                Gradient(colors: [Color(hex: "2A1610"), Color(hex: "180C08")]),
-                startPoint: .zero, endPoint: CGPoint(x: size.width * 0.6, y: size.height)
-            ))
+            // Antennae
+            drawAntenna(context: &context, sx: sx, sy: sy,
+                        stem: (CGPoint(x: 60, y: 14), CGPoint(x: 59, y: 8), CGPoint(x: 53, y: 2), CGPoint(x: 55, y: -3)),
+                        tip: CGPoint(x: 55, y: -4))
+            drawAntenna(context: &context, sx: sx, sy: sy,
+                        stem: (CGPoint(x: 88, y: 14), CGPoint(x: 89, y: 8), CGPoint(x: 95, y: 2), CGPoint(x: 93, y: -3)),
+                        tip: CGPoint(x: 93, y: -4))
 
-            // Ears
-            drawEar(context: &context, cx: 33 * scale, cy: 24 * scale, rx: 9 * scale, ry: 13 * scale, angle: -18)
-            drawEar(context: &context, cx: 87 * scale, cy: 24 * scale, rx: 9 * scale, ry: 13 * scale, angle: 18)
+            // Arms
+            let armColor = Color(hex: "9A3820")
+            fillEllipse(context: &context, cx: 10 * sx, cy: 74 * sy, rx: 14 * sx, ry: 12 * sy, color: armColor)
+            fillEllipse(context: &context, cx: 138 * sx, cy: 74 * sy, rx: 14 * sx, ry: 12 * sy, color: armColor)
+
+            // Legs
+            let legColor = Color(hex: "7A2A18")
+            fillRoundedRect(context: &context, x: 48 * sx, y: 128 * sy, w: 18 * sx, h: 30 * sy, r: 7 * sx, color: legColor)
+            fillRoundedRect(context: &context, x: 82 * sx, y: 128 * sy, w: 18 * sx, h: 30 * sy, r: 7 * sx, color: legColor)
 
             // Body
-            let bodyCenter = CGPoint(x: 60 * scale, y: 67 * scale)
-            let bodyPath = Path(ellipseIn: CGRect(
-                x: bodyCenter.x - 36 * scale, y: bodyCenter.y - 36 * scale,
-                width: 72 * scale, height: 72 * scale
-            ))
+            let bodyCenter = CGPoint(x: 74 * sx, y: 74 * sy)
+            let bodyR = 68 * sx
+            let bodyPath = Path(ellipseIn: CGRect(x: bodyCenter.x - bodyR, y: bodyCenter.y - bodyR, width: bodyR * 2, height: bodyR * 2))
             context.fill(bodyPath, with: .radialGradient(
-                Gradient(colors: [Color(hex: "E8A88A"), Color(hex: "B85840"), Color(hex: "7A2E1C")]),
-                center: CGPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 36 * scale
+                Gradient(colors: [Color(hex: "EAB090"), Color(hex: "C86040"), Color(hex: "9A3820"), Color(hex: "621808")]),
+                center: CGPoint(x: bodyCenter.x * 0.75, y: bodyCenter.y * 0.6),
+                startRadius: 0, endRadius: bodyR
             ))
 
-            // Eyes
-            drawEye(context: &context, cx: 49 * scale, cy: 63 * scale, rx: 8.5 * scale, ry: 9.5 * scale, pupilX: 50.5 * scale, pupilY: 64 * scale, pr: 5 * scale, catchX: 52.2 * scale, catchY: 61.5 * scale, scale: scale)
-            drawEye(context: &context, cx: 71 * scale, cy: 63 * scale, rx: 8.5 * scale, ry: 9.5 * scale, pupilX: 72.5 * scale, pupilY: 64 * scale, pr: 5 * scale, catchX: 74.2 * scale, catchY: 61.5 * scale, scale: scale)
+            // Specular
+            fillEllipse(context: &context, cx: 50 * sx, cy: 48 * sy, rx: 30 * sx, ry: 20 * sy, color: .white.opacity(0.12))
 
-            // Smile
-            var smile = Path()
-            smile.move(to: CGPoint(x: 52 * scale, y: 76 * scale))
-            smile.addQuadCurve(to: CGPoint(x: 68 * scale, y: 76 * scale), control: CGPoint(x: 60 * scale, y: 82 * scale))
-            context.stroke(smile, with: .color(Color(hex: "1C0C06").opacity(0.5)), lineWidth: 2 * scale)
+            // Eyes (dark sockets)
+            let eyeColor = Color(hex: "1A0806")
+            fillCircle(context: &context, cx: 55 * sx, cy: 72 * sy, r: 17 * sx, color: eyeColor)
+            fillCircle(context: &context, cx: 93 * sx, cy: 72 * sy, r: 17 * sx, color: eyeColor)
+
+            // Amber catchlights
+            let amber = Color(hex: "FFD060")
+            fillCircle(context: &context, cx: 59 * sx, cy: 67 * sy, r: 5.5 * sx, color: amber)
+            fillCircle(context: &context, cx: 97 * sx, cy: 67 * sy, r: 5.5 * sx, color: amber)
+
+            // Small secondary catchlights
+            fillCircle(context: &context, cx: 52 * sx, cy: 75 * sy, r: 1.8 * sx, color: amber.opacity(0.25))
+            fillCircle(context: &context, cx: 90 * sx, cy: 75 * sy, r: 1.8 * sx, color: amber.opacity(0.25))
+
+            // Mic badge
+            fillCircle(context: &context, cx: 113 * sx, cy: 115 * sy, r: 16 * sx, color: Color(hex: "0E0604"))
+            fillRoundedRect(context: &context, x: 110 * sx, y: 105 * sy, w: 7 * sx, h: 11 * sy, r: 3.5 * sx, color: .white)
+
+            // Mic arc
+            var micArc = Path()
+            micArc.move(to: CGPoint(x: 107 * sx, y: 113 * sy))
+            micArc.addQuadCurve(to: CGPoint(x: 113 * sx, y: 121 * sy), control: CGPoint(x: 107 * sx, y: 121 * sy))
+            micArc.addQuadCurve(to: CGPoint(x: 119 * sx, y: 113 * sy), control: CGPoint(x: 119 * sx, y: 121 * sy))
+            context.stroke(micArc, with: .color(.white), lineWidth: 1.9 * sx)
+
+            // Mic stand
+            var stand = Path()
+            stand.move(to: CGPoint(x: 113 * sx, y: 121 * sy))
+            stand.addLine(to: CGPoint(x: 113 * sx, y: 124.5 * sy))
+            context.stroke(stand, with: .color(.white), style: StrokeStyle(lineWidth: 1.9 * sx, lineCap: .round))
         }
     }
 
-    private func drawEar(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, angle: Double) {
-        var transform = CGAffineTransform.identity
-            .translatedBy(x: cx, y: cy)
-            .rotated(by: angle * .pi / 180)
-            .translatedBy(x: -cx, y: -cy)
-        let earPath = Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)).applying(transform)
-        context.fill(earPath, with: .color(Color(hex: "C0624A")))
+    private func drawAntenna(context: inout GraphicsContext, sx: CGFloat, sy: CGFloat,
+                             stem: (CGPoint, CGPoint, CGPoint, CGPoint), tip: CGPoint) {
+        var path = Path()
+        path.move(to: CGPoint(x: stem.0.x * sx, y: stem.0.y * sy))
+        path.addCurve(to: CGPoint(x: stem.3.x * sx, y: stem.3.y * sy),
+                       control1: CGPoint(x: stem.1.x * sx, y: stem.1.y * sy),
+                       control2: CGPoint(x: stem.2.x * sx, y: stem.2.y * sy))
+        context.stroke(path, with: .color(Color(hex: "C05A3C")), style: StrokeStyle(lineWidth: 2.2 * sx, lineCap: .round))
+        fillCircle(context: &context, cx: tip.x * sx, cy: tip.y * sy, r: 3 * sx, color: Color(hex: "D4856A"))
+        fillCircle(context: &context, cx: tip.x * sx, cy: tip.y * sy, r: 1.8 * sx, color: Color(hex: "EAA882"))
     }
 
-    private func drawEye(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, pupilX: CGFloat, pupilY: CGFloat, pr: CGFloat, catchX: CGFloat, catchY: CGFloat, scale: CGFloat) {
-        let white = Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2))
-        context.fill(white, with: .color(.white))
+    private func fillCircle(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, r: CGFloat, color: Color) {
+        context.fill(Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)), with: .color(color))
+    }
 
-        let pupil = Path(ellipseIn: CGRect(x: pupilX - pr, y: pupilY - pr, width: pr * 2, height: pr * 2))
-        context.fill(pupil, with: .color(Color(hex: "1C0C06")))
+    private func fillEllipse(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, rx: CGFloat, ry: CGFloat, color: Color) {
+        context.fill(Path(ellipseIn: CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)), with: .color(color))
+    }
 
-        let catchlight = Path(ellipseIn: CGRect(x: catchX - 1.7 * scale, y: catchY - 1.7 * scale, width: 3.4 * scale, height: 3.4 * scale))
-        context.fill(catchlight, with: .color(.white))
+    private func fillRoundedRect(context: inout GraphicsContext, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, r: CGFloat, color: Color) {
+        context.fill(Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: r), with: .color(color))
     }
 }

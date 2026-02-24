@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Claudio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+    :root {
+      --bg: #0A0806;
+      --surface: #161210;
+      --amber: #D4A574;
+      --text: #F5F0EB;
+      --text-muted: #6B5D52;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 2rem 1.5rem;
+      border-bottom: 1px solid rgba(107,93,82,0.1);
+    }
+
+    header a {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      color: var(--amber);
+      text-decoration: none;
+    }
+
+    main {
+      flex: 1;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-weight: 400;
+      font-size: 2rem;
+      margin-bottom: 0.4rem;
+      color: var(--text);
+    }
+
+    .updated {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-family: 'Playfair Display', serif;
+      font-weight: 400;
+      font-size: 1.15rem;
+      color: var(--amber);
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: rgba(245,240,235,0.7);
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    ul {
+      color: rgba(245,240,235,0.7);
+      margin-bottom: 1rem;
+      padding-left: 1.2rem;
+      font-size: 0.9rem;
+    }
+
+    li { margin-bottom: 0.3rem; }
+
+    a { color: var(--amber); }
+
+    footer {
+      padding: 2rem 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      border-top: 1px solid rgba(107,93,82,0.1);
+    }
+
+    footer a {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    footer a:hover { color: var(--amber); }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="index.html">Claudio</a>
+  </header>
+
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: February 24, 2026</p>
+
+    <h2>Overview</h2>
+    <p>Claudio is a project of Kochito Labs, a Wyoming corporation. It is a client app that connects to servers you configure. We are committed to protecting your privacy and being transparent about how the app works.</p>
+
+    <h2>Data We Collect</h2>
+    <p>Claudio does not collect, store, or transmit any personal data to us. Specifically:</p>
+    <ul>
+      <li>We do not operate any servers that receive your data.</li>
+      <li>We do not use analytics, tracking, or advertising SDKs.</li>
+      <li>We do not collect crash reports automatically.</li>
+    </ul>
+
+    <h2>Data Stored on Your Device</h2>
+    <p>The app stores the following locally on your device only:</p>
+    <ul>
+      <li><strong>Server URLs and authentication tokens</strong> you configure in Settings.</li>
+      <li><strong>Conversation history</strong> for your current session (cleared when you clear the conversation).</li>
+      <li><strong>Your selected agent preference.</strong></li>
+    </ul>
+    <p>This data never leaves your device except when sent to the server(s) you have configured.</p>
+
+    <h2>Third-Party Servers</h2>
+    <p>Claudio sends your messages to server endpoints that you configure. We have no control over how those servers process your data. Please review the privacy practices of any server you connect to.</p>
+
+    <h2>Microphone & Speech Recognition</h2>
+    <p>When you enable voice mode, the app uses Apple's on-device speech recognition to transcribe your voice. Audio data is processed locally by iOS and is not sent to us. Transcribed text is sent to your configured server as a regular message.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>Claudio is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+    <h2>Changes</h2>
+    <p>We may update this policy from time to time. Changes will be posted on this page with an updated date.</p>
+
+    <h2>Contact</h2>
+    <p>Questions? Reach us at <a href="mailto:hello@kochi.to">hello@kochi.to</a>.</p>
+  </main>
+
+  <footer>
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="terms.html">Terms of Service</a>
+  </footer>
+</body>
+</html>
