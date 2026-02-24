@@ -3,9 +3,11 @@ import SwiftUI
 struct ChatView: View {
     @State private var chatService = ChatService()
     @State private var speechRecognizer = SpeechRecognizer()
+    @State private var eviService = EVIService()
     @State private var messageText = ""
     @State private var voiceEnabled = false
     @State private var showSettings = false
+    @State private var showVoiceSession = false
 
     var body: some View {
         ZStack {
@@ -111,6 +113,7 @@ struct ChatView: View {
                     InputBar(
                         text: $messageText,
                         voiceEnabled: voiceEnabled,
+                        voiceSessionActive: showVoiceSession,
                         isListening: speechRecognizer.isListening,
                         audioLevel: speechRecognizer.audioLevel,
                         transcript: speechRecognizer.transcript,
@@ -118,10 +121,7 @@ struct ChatView: View {
                         onSend: sendTextMessage,
                         onToggleVoice: {
                             HapticsManager.tap()
-                            voiceEnabled.toggle()
-                            if !voiceEnabled && speechRecognizer.isListening {
-                                _ = speechRecognizer.stopListening()
-                            }
+                            startVoiceSession()
                         },
                         onMicDown: {
                             HapticsManager.tap()
@@ -145,6 +145,12 @@ struct ChatView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(chatService: chatService)
         }
+        .fullScreenCover(isPresented: $showVoiceSession) {
+            VoiceSessionView(
+                eviService: eviService,
+                onDismiss: { endVoiceSession() }
+            )
+        }
         .onAppear {
             speechRecognizer.requestAuthorization()
             if chatService.hasServer {
@@ -167,5 +173,46 @@ struct ChatView: View {
         guard !text.isEmpty else { return }
         messageText = ""
         chatService.sendMessage(text, playVoice: voiceEnabled)
+    }
+
+    private func startVoiceSession() {
+        guard let server = chatService.selectedServer else { return }
+
+        // Stop any active speech recognition
+        if speechRecognizer.isListening {
+            _ = speechRecognizer.stopListening()
+        }
+        chatService.stopSpeaking()
+
+        // Wire callbacks so voice transcripts appear in chat history
+        eviService.onUserMessage = { [chatService] text in
+            chatService.appendVoiceMessage(role: .user, content: text)
+        }
+        eviService.onAssistantMessage = { [chatService] text in
+            chatService.appendVoiceMessage(role: .assistant, content: text)
+        }
+
+        showVoiceSession = true
+
+        Task {
+            do {
+                let config = try await eviService.fetchConfig(
+                    serverURL: server.url,
+                    token: server.token
+                )
+                await eviService.connect(config: config)
+            } catch {
+                await MainActor.run {
+                    eviService.state = .error("Could not connect to voice service.")
+                }
+            }
+        }
+    }
+
+    private func endVoiceSession() {
+        showVoiceSession = false
+        Task {
+            await eviService.disconnect()
+        }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct InputBar: View {
     @Binding var text: String
     let voiceEnabled: Bool
+    let voiceSessionActive: Bool
     let isListening: Bool
     let audioLevel: Float
     let transcript: String
@@ -56,25 +57,30 @@ struct InputBar: View {
                 Button {
                     onToggleVoice()
                 } label: {
-                    Image(systemName: voiceEnabled ? "waveform" : "waveform")
-                        .font(.system(size: 14))
-                        .foregroundStyle(voiceEnabled ? Theme.accent : Theme.textSecondary.opacity(0.5))
+                    Image(systemName: voiceSessionActive ? "waveform.circle.fill" : "waveform")
+                        .font(.system(size: voiceSessionActive ? 18 : 14))
+                        .foregroundStyle(voiceSessionActive ? Theme.accent : voiceEnabled ? Theme.accent : Theme.textSecondary.opacity(0.5))
                         .frame(width: 36, height: 36)
                         .background(
-                            voiceEnabled ? Theme.accent.opacity(0.15) : Color.clear,
+                            (voiceEnabled || voiceSessionActive) ? Theme.accent.opacity(0.15) : Color.clear,
                             in: Circle()
                         )
                 }
 
                 // Text field
                 HStack(spacing: Theme.spacing) {
-                    TextField("Message", text: $text, axis: .vertical)
+                    TextField("Message", text: $text)
                         .font(Theme.body)
                         .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1...5)
                         .focused($isFocused)
                         .tint(Theme.accent)
                         .disabled(isListening)
+                        .submitLabel(.send)
+                        .onSubmit {
+                            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                onSend()
+                            }
+                        }
                 }
                 .padding(.horizontal, Theme.spacing * 1.5)
                 .padding(.vertical, Theme.spacing * 1.25)

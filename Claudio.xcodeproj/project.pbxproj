@@ -21,6 +21,9 @@
 		A1000001000000000000000C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000C /* Theme.swift */; };
 		A1000001000000000000000D /* LaunchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000E /* LaunchScreen.swift */; };
 		A1000001000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000F /* Assets.xcassets */; };
+		B10000010000000000000001 /* EVIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* EVIService.swift */; };
+		B10000010000000000000002 /* VoiceSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* VoiceSessionView.swift */; };
+		B10000010000000000000003 /* Hume in Frameworks */ = {isa = PBXBuildFile; productRef = C20000010000000000000001 /* Hume */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +43,8 @@
 		A2000001000000000000000E /* LaunchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
 		A2000001000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Claudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Claudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000010000000000000001 /* EVIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EVIService.swift; sourceTree = "<group>"; };
+		B20000010000000000000002 /* VoiceSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +52,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000010000000000000003 /* Hume in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -94,6 +100,7 @@
 				A20000010000000000000008 /* AgentPicker.swift */,
 				A20000010000000000000009 /* SettingsView.swift */,
 				A2000001000000000000000E /* LaunchScreen.swift */,
+				B20000010000000000000002 /* VoiceSessionView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -103,6 +110,7 @@
 			children = (
 				A2000001000000000000000A /* SpeechRecognizer.swift */,
 				A2000001000000000000000B /* HapticsManager.swift */,
+				B20000010000000000000001 /* EVIService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -139,6 +147,9 @@
 			dependencies = (
 			);
 			name = Claudio;
+			packageProductDependencies = (
+				C20000010000000000000001 /* Hume */,
+			);
 			productName = Claudio;
 			productReference = A30000010000000000000001 /* Claudio.app */;
 			productType = "com.apple.product-type.application";
@@ -167,6 +178,9 @@
 				Base,
 			);
 			mainGroup = A50000010000000000000001;
+			packageReferences = (
+				C10000010000000000000001 /* XCRemoteSwiftPackageReference "hume-swift-sdk" */,
+			);
 			productRefGroup = A50000010000000000000007 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -205,6 +219,8 @@
 				A1000001000000000000000B /* HapticsManager.swift in Sources */,
 				A1000001000000000000000C /* Theme.swift in Sources */,
 				A1000001000000000000000D /* LaunchScreen.swift in Sources */,
+				B10000010000000000000001 /* EVIService.swift in Sources */,
+				B10000010000000000000002 /* VoiceSessionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,6 +358,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C10000010000000000000001 /* XCRemoteSwiftPackageReference "hume-swift-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/HumeAI/hume-swift-sdk.git";
+			requirement = {
+				kind = exactVersion;
+				version = "0.0.1-beta8";
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C20000010000000000000001 /* Hume */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000010000000000000001 /* XCRemoteSwiftPackageReference "hume-swift-sdk" */;
+			productName = Hume;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A60000010000000000000002 /* Project object */;
 }

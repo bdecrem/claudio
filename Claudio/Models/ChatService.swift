@@ -76,9 +76,21 @@ final class ChatService {
         } else {
             self.savedServers = []
         }
+
+        // Restore chat histories if last session was <24h ago
+        restoreChatHistories()
     }
 
-    struct Agent: Identifiable, Equatable, Decodable {
+    struct Agent: Identifiable, Equatable {
+        let id: String          // unique key: "serverIndex:agentId"
+        let agentId: String     // raw agent id sent to the API
+        let name: String
+        let emoji: String?
+        let color: String?
+        let serverIndex: Int    // which server this agent belongs to
+    }
+
+    private struct DecodedAgent: Decodable {
         let id: String
         let name: String
         let emoji: String?
@@ -91,23 +103,14 @@ final class ChatService {
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
         guard !cleaned.isEmpty else { return }
-        // Add https:// if no scheme provided
         if !cleaned.hasPrefix("http://") && !cleaned.hasPrefix("https://") {
             cleaned = "https://\(cleaned)"
         }
-        let isFirst = savedServers.isEmpty
         savedServers.append(Server(url: cleaned, token: token))
-        if isFirst {
-            // activeServerIndex is already 0, just fetch agents
+        if savedServers.count == 1 {
             activeServerIndex = 0
-            agents.removeAll()
-            selectedAgent = ""
-            agentFetchFailed = false
-            connectionError = nil
-            Task { await fetchAgents() }
-        } else {
-            switchServer(to: savedServers.count - 1)
         }
+        Task { await fetchAgents() }
     }
 
     func updateServer(at index: Int, url: String, token: String) {
@@ -121,9 +124,7 @@ final class ChatService {
             url: cleaned,
             token: token
         )
-        if index == activeServerIndex {
-            Task { await fetchAgents() }
-        }
+        Task { await fetchAgents() }
     }
 
     func removeServer(at index: Int) {
@@ -132,96 +133,117 @@ final class ChatService {
         if activeServerIndex >= savedServers.count {
             activeServerIndex = max(0, savedServers.count - 1)
         }
+        // Re-fetch since server indices shifted
+        Task { await fetchAgents() }
     }
 
     func switchServer(to index: Int) {
         guard savedServers.indices.contains(index), index != activeServerIndex else { return }
-        // Save current agent's messages
-        if !selectedAgent.isEmpty {
-            chatHistories[selectedAgent] = messages
-        }
         activeServerIndex = index
-        messages.removeAll()
-        agents.removeAll()
-        selectedAgent = ""
-        agentFetchFailed = false
-        connectionError = nil
-        chatHistories.removeAll()
-        Task { await fetchAgents() }
     }
 
     // MARK: - Auth helper
 
-    private func authorizedRequest(url: URL) -> URLRequest {
+    private func authorizedRequest(url: URL, server: Server) -> URLRequest {
         var request = URLRequest(url: url)
-        if let token = activeServer?.token, !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if !server.token.isEmpty {
+            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
         }
         return request
+    }
+
+    /// Find the server for a given agent
+    func server(for agent: Agent) -> Server? {
+        guard savedServers.indices.contains(agent.serverIndex) else { return nil }
+        return savedServers[agent.serverIndex]
+    }
+
+    /// Find the server for the currently selected agent
+    var selectedServer: Server? {
+        guard let agent = agents.first(where: { $0.id == selectedAgent }) else {
+            return activeServer
+        }
+        return server(for: agent)
+    }
+
+    /// Find the raw agent ID for the currently selected agent
+    var selectedAgentId: String {
+        agents.first(where: { $0.id == selectedAgent })?.agentId ?? selectedAgent
     }
 
     // MARK: - Agents
 
     @MainActor
     func fetchAgents() async {
-        guard let server = activeServer else {
-            log.error("fetchAgents: no active server")
-            agentFetchFailed = true
-            return
-        }
-        let endpoint = server.url
-        guard let url = URL(string: "\(endpoint)/api/agents") else {
-            log.error("fetchAgents: invalid URL from '\(endpoint)'")
+        guard !savedServers.isEmpty else {
+            log.error("fetchAgents: no servers configured")
             agentFetchFailed = true
             return
         }
 
-        log.info("fetchAgents: GET \(url)")
-        let request = authorizedRequest(url: url)
+        var allAgents: [Agent] = []
+        var anySuccess = false
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                log.error("fetchAgents: not an HTTP response")
-                agentFetchFailed = true
-                return
+        for (index, server) in savedServers.enumerated() {
+            guard let url = URL(string: "\(server.url)/api/agents") else {
+                log.error("fetchAgents: invalid URL from '\(server.url)'")
+                continue
             }
 
-            log.info("fetchAgents: status \(httpResponse.statusCode)")
+            log.info("fetchAgents: GET \(url)")
+            let request = authorizedRequest(url: url, server: server)
 
-            if httpResponse.statusCode == 401 {
-                agentFetchFailed = true
-                connectionError = "Authentication required. Check your token."
-                return
-            }
-            if httpResponse.statusCode == 403 {
-                agentFetchFailed = true
-                connectionError = "Invalid token. Check Settings."
-                return
-            }
-            guard (200...299).contains(httpResponse.statusCode) else {
-                agentFetchFailed = true
-                connectionError = "Server error (\(httpResponse.statusCode))."
-                return
-            }
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    log.error("fetchAgents: not an HTTP response from \(server.url)")
+                    continue
+                }
 
-            struct AgentsResponse: Decodable {
-                let agents: [Agent]
-            }
+                log.info("fetchAgents: \(server.url) status \(httpResponse.statusCode)")
 
-            let decoded = try JSONDecoder().decode(AgentsResponse.self, from: data)
-            log.info("fetchAgents: got \(decoded.agents.count) agents")
-            agents = decoded.agents
-            agentFetchFailed = false
-            connectionError = nil
+                if httpResponse.statusCode == 401 {
+                    connectionError = "Authentication required for \(server.url)."
+                    continue
+                }
+                if httpResponse.statusCode == 403 {
+                    connectionError = "Invalid token for \(server.url)."
+                    continue
+                }
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    continue
+                }
 
-            if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
-                selectedAgent = agents.first?.id ?? ""
-                log.info("fetchAgents: selected '\(self.selectedAgent)'")
+                struct AgentsResponse: Decodable {
+                    let agents: [DecodedAgent]
+                }
+
+                let decoded = try JSONDecoder().decode(AgentsResponse.self, from: data)
+                log.info("fetchAgents: \(server.url) returned \(decoded.agents.count) agents")
+
+                for a in decoded.agents {
+                    allAgents.append(Agent(
+                        id: "\(index):\(a.id)",
+                        agentId: a.id,
+                        name: a.name,
+                        emoji: a.emoji,
+                        color: a.color,
+                        serverIndex: index
+                    ))
+                }
+                anySuccess = true
+            } catch {
+                log.error("fetchAgents: \(server.url) error — \(error)")
             }
-        } catch {
-            log.error("fetchAgents: error — \(error)")
-            agentFetchFailed = true
+        }
+
+        agents = allAgents
+        agentFetchFailed = !anySuccess
+        if anySuccess { connectionError = nil }
+
+        if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
+            selectedAgent = agents.first?.id ?? ""
+            log.info("fetchAgents: selected '\(self.selectedAgent)'")
         }
     }
 
@@ -231,23 +253,26 @@ final class ChatService {
         let userMessage = Message(role: .user, content: content)
         messages.append(userMessage)
         connectionError = nil
+        persistChatHistories()
 
-        let agentId = selectedAgent
-        let server = activeServer
+        let compositeId = selectedAgent
+        let rawAgentId = selectedAgentId
+        let server = selectedServer
         let history = messages.map { $0.apiRepresentation }
 
-        log.info("sendMessage: agent='\(agentId)' server='\(server?.url ?? "nil")' messages=\(history.count)")
+        log.info("sendMessage: agent='\(rawAgentId)' server='\(server?.url ?? "nil")' messages=\(history.count)")
 
-        pendingAgents.insert(agentId)
+        pendingAgents.insert(compositeId)
         isLoading = isLoadingCurrentAgent
 
         Task {
-            await fetchResponse(agentId: agentId, server: server, history: history, playVoice: playVoice)
+            await fetchResponse(compositeId: compositeId, agentId: rawAgentId, server: server, history: history, playVoice: playVoice)
         }
     }
 
     @MainActor
     private func fetchResponse(
+        compositeId: String,
         agentId: String,
         server: Server?,
         history: [[String: String]],
@@ -255,15 +280,15 @@ final class ChatService {
     ) async {
         guard let server else {
             log.error("fetchResponse: no server")
-            deliverResult(.failure("No server configured."), to: agentId)
+            deliverResult(.failure("No server configured."), to: compositeId)
             return
         }
         guard let url = URL(string: "\(server.url)/api/chat/agent") else {
             log.error("fetchResponse: invalid URL from '\(server.url)'")
-            deliverResult(.failure("Invalid server address."), to: agentId)
+            deliverResult(.failure("Invalid server address."), to: compositeId)
             return
         }
-        log.info("fetchResponse: POST \(url)")
+        log.info("fetchResponse: POST \(url) agent='\(agentId)'")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -278,7 +303,7 @@ final class ChatService {
         }
 
         guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            deliverResult(.failure("Failed to encode request."), to: agentId)
+            deliverResult(.failure("Failed to encode request."), to: compositeId)
             return
         }
         request.httpBody = httpBody
@@ -287,17 +312,17 @@ final class ChatService {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                deliverResult(.failure("Invalid response."), to: agentId)
+                deliverResult(.failure("Invalid response."), to: compositeId)
                 return
             }
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                deliverResult(.failure("Authentication failed. Check your token."), to: agentId)
+                deliverResult(.failure("Authentication failed. Check your token."), to: compositeId)
                 return
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
-                deliverResult(.failure("Server error (\(httpResponse.statusCode))."), to: agentId)
+                deliverResult(.failure("Server error (\(httpResponse.statusCode))."), to: compositeId)
                 return
             }
 
@@ -305,21 +330,21 @@ final class ChatService {
                   let choices = json["choices"] as? [[String: Any]],
                   let message = choices.first?["message"] as? [String: Any],
                   let content = message["content"] as? String else {
-                deliverResult(.failure("Unexpected response format."), to: agentId)
+                deliverResult(.failure("Unexpected response format."), to: compositeId)
                 return
             }
 
-            deliverResult(.success(content), to: agentId)
+            deliverResult(.success(content), to: compositeId)
 
             if playVoice {
                 await playTTS(for: content, agentId: agentId, server: server)
             }
         } catch let urlError as URLError {
             log.error("fetchResponse: URLError \(urlError.code.rawValue) — \(urlError.localizedDescription)")
-            deliverResult(.failure("Can't connect to server."), to: agentId)
+            deliverResult(.failure("Can't connect to server."), to: compositeId)
         } catch {
             log.error("fetchResponse: error — \(error)")
-            deliverResult(.failure("Connection error."), to: agentId)
+            deliverResult(.failure("Connection error."), to: compositeId)
         }
     }
 
@@ -352,6 +377,7 @@ final class ChatService {
         }
 
         isLoading = isLoadingCurrentAgent
+        persistChatHistories()
     }
 
     // MARK: - TTS
@@ -397,11 +423,55 @@ final class ChatService {
         messages.removeAll()
         chatHistories[selectedAgent] = nil
         connectionError = nil
+        persistChatHistories()
     }
 
     func stopSpeaking() {
         audioPlayer?.stop()
         isSpeaking = false
+    }
+
+    func appendVoiceMessage(role: Message.Role, content: String) {
+        let message = Message(role: role, content: content)
+        messages.append(message)
+        persistChatHistories()
+    }
+
+    // MARK: - Chat persistence
+
+    func persistChatHistories() {
+        // Snapshot current agent's messages into histories
+        var histories = chatHistories
+        if !selectedAgent.isEmpty {
+            histories[selectedAgent] = messages
+        }
+
+        let payload = CodableChatState(
+            histories: histories,
+            savedAt: Date()
+        )
+        if let data = try? JSONEncoder().encode(payload) {
+            UserDefaults.standard.set(data, forKey: "chatState")
+        }
+    }
+
+    private func restoreChatHistories() {
+        guard let data = UserDefaults.standard.data(forKey: "chatState"),
+              let state = try? JSONDecoder().decode(CodableChatState.self, from: data) else { return }
+
+        let age = Date().timeIntervalSince(state.savedAt)
+        guard age < 24 * 60 * 60 else {
+            // Stale — discard
+            UserDefaults.standard.removeObject(forKey: "chatState")
+            return
+        }
+
+        chatHistories = state.histories
+        if !selectedAgent.isEmpty {
+            messages = chatHistories[selectedAgent] ?? []
+        }
+        let count = chatHistories.count
+        log.info("Restored chat histories (\(count) agents, \(Int(age))s old)")
     }
 
     private func persistServers() {
@@ -417,6 +487,11 @@ final class ChatService {
 private struct CodableServer: Codable {
     let url: String
     let token: String
+}
+
+private struct CodableChatState: Codable {
+    let histories: [String: [Message]]
+    let savedAt: Date
 }
 
 // MARK: - AVAudioPlayerDelegate
