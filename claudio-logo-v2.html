@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudio — Logo v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #111210;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+    gap: 72px;
+    padding: 60px 40px;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .icon-wrap {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(-1deg); }
+    50% { transform: translateY(-9px) rotate(1.5deg); }
+  }
+
+  .wordmark-main {
+    font-family: 'Fraunces', serif;
+    font-size: 64px;
+    font-weight: 700;
+    font-optical-sizing: auto;
+    /* Shifted: warm clay → dusty rose → deep plum-red */
+    background: linear-gradient(135deg, #D4856A 0%, #B85C45 50%, #8C3A2A 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  .tagline {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.28);
+  }
+
+  hr {
+    width: 100%;
+    max-width: 560px;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.16);
+    margin-bottom: -16px;
+  }
+
+  /* Variants */
+  .variants { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+  .card {
+    border-radius: 24px;
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .card-light { background: #F6F4F1; border: 1px solid rgba(0,0,0,0.07); }
+  .card-dark  { background: #1C1B19; border: 1px solid rgba(255,255,255,0.05); }
+  .card-clay  {
+    background: linear-gradient(145deg, #C4705A 0%, #8C3A2A 100%);
+  }
+
+  .card-light .wordmark-main,
+  .card-dark .wordmark-main  { font-size: 30px; }
+
+  .card-clay .wordmark-main {
+    font-size: 30px;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.82) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .card-light .tagline { color: rgba(0,0,0,0.28); }
+  .card-dark  .tagline { color: rgba(255,255,255,0.28); }
+  .card-clay  .tagline { color: rgba(255,255,255,0.55); }
+
+  /* App icon */
+  .app-icon-row { display: flex; gap: 20px; align-items: flex-end; }
+
+  .app-icon {
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 20px 55px rgba(140, 58, 42, 0.4), 0 4px 16px rgba(0,0,0,0.45);
+    transition: transform 0.3s ease;
+  }
+  .app-icon:hover { transform: scale(1.06) rotate(-2deg); }
+
+  .app-icon-sm {
+    border-radius: 16px;
+    box-shadow: 0 10px 28px rgba(140,58,42,0.3), 0 2px 8px rgba(0,0,0,0.35);
+  }
+  .app-icon-sm:hover { transform: scale(1.06) rotate(2deg); }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="icon-wrap">
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Body: warm clay, not orange — more terracotta/sienna -->
+        <radialGradient id="bodyG" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#C0624A"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="earG" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+        <!-- Subtle warm belly glow -->
+        <radialGradient id="bellyG" cx="50%" cy="38%" r="52%">
+          <stop offset="0%"   stop-color="#F2D4C0" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#E8A88A" stop-opacity="0"/>
+        </radialGradient>
+        <!-- Shadow under -->
+        <radialGradient id="shadowG" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#7A2E1C" stop-opacity="0.45"/>
+          <stop offset="100%" stop-color="#7A2E1C" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#7A2E1C" flood-opacity="0.38"/>
+        </filter>
+      </defs>
+
+      <!-- Ground shadow -->
+      <ellipse cx="60" cy="108" rx="30" ry="6.5" fill="url(#shadowG)" opacity="0.55"/>
+
+      <!-- Ears -->
+      <ellipse cx="38" cy="27" rx="10" ry="14" fill="url(#earG)" transform="rotate(-18 38 27)"/>
+      <ellipse cx="82" cy="27" rx="10" ry="14" fill="url(#earG)" transform="rotate(18 82 27)"/>
+      <!-- Ear inner shadow -->
+      <ellipse cx="37.5" cy="26" rx="5.5" ry="8.5" fill="#7A2E1C" opacity="0.22" transform="rotate(-18 37.5 26)"/>
+      <ellipse cx="82.5" cy="26" rx="5.5" ry="8.5" fill="#7A2E1C" opacity="0.22" transform="rotate(18 82.5 26)"/>
+
+      <!-- Body -->
+      <circle cx="60" cy="65" r="40" fill="url(#bodyG)" filter="url(#drop)"/>
+      <!-- Belly warmth -->
+      <ellipse cx="60" cy="57" rx="23" ry="21" fill="url(#bellyG)"/>
+      <!-- Specular sheen -->
+      <ellipse cx="49" cy="47" rx="13" ry="7.5" fill="white" opacity="0.16" transform="rotate(-14 49 47)"/>
+
+      <!-- Eyes (whites) -->
+      <ellipse cx="49" cy="60" rx="9" ry="10" fill="white"/>
+      <ellipse cx="71" cy="60" rx="9" ry="10" fill="white"/>
+      <!-- Pupils — warmer dark brown, not pure black -->
+      <circle cx="50.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <!-- Catchlights -->
+      <circle cx="52.2" cy="58.5" r="1.9" fill="white" opacity="0.88"/>
+      <circle cx="74.2" cy="58.5" r="1.9" fill="white" opacity="0.88"/>
+      <!-- Tiny lower catchlight -->
+      <circle cx="49.8" cy="63.5" r="0.9" fill="white" opacity="0.35"/>
+      <circle cx="71.8" cy="63.5" r="0.9" fill="white" opacity="0.35"/>
+
+      <!-- Gentle smile -->
+      <path d="M 52 75 Q 60 81.5 68 75" stroke="#1C0C06" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.55"/>
+
+      <!-- Mic badge — muted dark berry, not black -->
+      <circle cx="86" cy="90" r="14" fill="#2A0F0A" opacity="0.82"/>
+      <!-- Subtle inner ring -->
+      <circle cx="86" cy="90" r="12.5" stroke="rgba(255,255,255,0.06)" stroke-width="1" fill="none"/>
+      <!-- Mic body -->
+      <rect x="83" y="81.5" width="6" height="10" rx="3" fill="white"/>
+      <!-- Mic arc -->
+      <path d="M 80 89 Q 80 95.5 86 95.5 Q 92 95.5 92 89" stroke="white" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <!-- Stand -->
+      <line x1="86" y1="95.5" x2="86" y2="98.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="83" y1="98.5" x2="89" y2="98.5" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div class="wordmark-main">Claudio</div>
+  <div class="tagline">Voice & Text · Powered by OpenClaw</div>
+</div>
+
+<hr>
+
+<!-- VARIANTS -->
+<div class="section-label">Context Variants</div>
+<div class="variants">
+
+  <!-- Light -->
+  <div class="card card-light">
+    <svg width="50" height="50" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="bL" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#C0624A"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="eL" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="38" cy="27" rx="10" ry="14" fill="url(#eL)" transform="rotate(-18 38 27)"/>
+      <ellipse cx="82" cy="27" rx="10" ry="14" fill="url(#eL)" transform="rotate(18 82 27)"/>
+      <circle cx="60" cy="65" r="40" fill="url(#bL)"/>
+      <ellipse cx="49" cy="47" rx="13" ry="7.5" fill="white" opacity="0.18" transform="rotate(-14 49 47)"/>
+      <ellipse cx="49" cy="60" rx="9" ry="10" fill="white"/>
+      <ellipse cx="71" cy="60" rx="9" ry="10" fill="white"/>
+      <circle cx="50.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <circle cx="52.2" cy="58.5" r="1.9" fill="white"/>
+      <circle cx="74.2" cy="58.5" r="1.9" fill="white"/>
+    </svg>
+    <div class="wordmark-main" style="font-size:29px">Claudio</div>
+    <div class="tagline">Light</div>
+  </div>
+
+  <!-- Dark -->
+  <div class="card card-dark">
+    <svg width="50" height="50" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="bD" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#C0624A"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="eD" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="38" cy="27" rx="10" ry="14" fill="url(#eD)" transform="rotate(-18 38 27)"/>
+      <ellipse cx="82" cy="27" rx="10" ry="14" fill="url(#eD)" transform="rotate(18 82 27)"/>
+      <circle cx="60" cy="65" r="40" fill="url(#bD)"/>
+      <ellipse cx="49" cy="47" rx="13" ry="7.5" fill="white" opacity="0.18" transform="rotate(-14 49 47)"/>
+      <ellipse cx="49" cy="60" rx="9" ry="10" fill="white"/>
+      <ellipse cx="71" cy="60" rx="9" ry="10" fill="white"/>
+      <circle cx="50.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="61" r="5.5" fill="#1C0C06"/>
+      <circle cx="52.2" cy="58.5" r="1.9" fill="white"/>
+      <circle cx="74.2" cy="58.5" r="1.9" fill="white"/>
+    </svg>
+    <div class="wordmark-main" style="font-size:29px">Claudio</div>
+    <div class="tagline">Dark</div>
+  </div>
+
+  <!-- Clay brand -->
+  <div class="card card-clay">
+    <svg width="50" height="50" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="38" cy="27" rx="10" ry="14" fill="rgba(255,255,255,0.45)" transform="rotate(-18 38 27)"/>
+      <ellipse cx="82" cy="27" rx="10" ry="14" fill="rgba(255,255,255,0.45)" transform="rotate(18 82 27)"/>
+      <circle cx="60" cy="65" r="40" fill="rgba(255,255,255,0.18)"/>
+      <ellipse cx="49" cy="60" rx="9" ry="10" fill="white" opacity="0.95"/>
+      <ellipse cx="71" cy="60" rx="9" ry="10" fill="white" opacity="0.95"/>
+      <circle cx="50.5" cy="61" r="5.5" fill="#6B2218"/>
+      <circle cx="72.5" cy="61" r="5.5" fill="#6B2218"/>
+      <circle cx="52.2" cy="58.5" r="1.9" fill="white"/>
+      <circle cx="74.2" cy="58.5" r="1.9" fill="white"/>
+    </svg>
+    <div class="wordmark-main" style="font-size:29px">Claudio</div>
+    <div class="tagline">Brand</div>
+  </div>
+
+</div>
+
+<hr>
+
+<!-- APP ICONS -->
+<div class="section-label">App Icon</div>
+<div class="app-icon-row">
+
+  <div class="app-icon" style="width:120px;height:120px;">
+    <svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="iconBgV2" x1="0" y1="0" x2="0.6" y2="1">
+          <stop offset="0%" stop-color="#2A1610"/>
+          <stop offset="100%" stop-color="#180C08"/>
+        </linearGradient>
+        <radialGradient id="bodyV2" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#B85840"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="earV2" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+        <!-- Subtle noise-ish grain using a gentle pattern -->
+        <radialGradient id="glow" cx="35%" cy="25%" r="60%">
+          <stop offset="0%"   stop-color="#C0624A" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#C0624A" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="sheenV2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="white" stop-opacity="0.12"/>
+          <stop offset="50%"  stop-color="white" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Background: deep dark charcoal with warm undertone -->
+      <rect width="120" height="120" fill="url(#iconBgV2)"/>
+      <!-- Warm glow in upper left -->
+      <rect width="120" height="120" fill="url(#glow)"/>
+      <!-- Sheen -->
+      <rect width="120" height="60" fill="url(#sheenV2)"/>
+
+      <!-- Ears -->
+      <ellipse cx="33" cy="24" rx="9" ry="13" fill="url(#earV2)" transform="rotate(-18 33 24)"/>
+      <ellipse cx="87" cy="24" rx="9" ry="13" fill="url(#earV2)" transform="rotate(18 87 24)"/>
+
+      <!-- Body -->
+      <circle cx="60" cy="67" r="36" fill="url(#bodyV2)"/>
+      <ellipse cx="48" cy="51" rx="11" ry="6" fill="white" opacity="0.16" transform="rotate(-14 48 51)"/>
+
+      <!-- Eyes -->
+      <ellipse cx="49" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <ellipse cx="71" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <circle cx="50.5" cy="64" r="5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="64" r="5" fill="#1C0C06"/>
+      <circle cx="52.2" cy="61.5" r="1.7" fill="white"/>
+      <circle cx="74.2" cy="61.5" r="1.7" fill="white"/>
+
+      <!-- Smile -->
+      <path d="M 52 76 Q 60 82 68 76" stroke="#1C0C06" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+
+      <!-- Mic badge -->
+      <circle cx="88" cy="92" r="13" fill="#1C0C06" opacity="0.75"/>
+      <rect x="85" y="83.5" width="6" height="9" rx="3" fill="white"/>
+      <path d="M 82 89.5 Q 82 95.5 88 95.5 Q 94 95.5 94 89.5" stroke="white" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <line x1="88" y1="95.5" x2="88" y2="98.5" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <div class="app-icon app-icon-sm" style="width:76px;height:76px;">
+    <svg width="76" height="76" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg76" x1="0" y1="0" x2="0.6" y2="1">
+          <stop offset="0%" stop-color="#2A1610"/>
+          <stop offset="100%" stop-color="#180C08"/>
+        </linearGradient>
+        <radialGradient id="body76" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#B85840"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="ear76" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+      </defs>
+      <rect width="120" height="120" fill="url(#bg76)"/>
+      <ellipse cx="33" cy="24" rx="9" ry="13" fill="url(#ear76)" transform="rotate(-18 33 24)"/>
+      <ellipse cx="87" cy="24" rx="9" ry="13" fill="url(#ear76)" transform="rotate(18 87 24)"/>
+      <circle cx="60" cy="67" r="36" fill="url(#body76)"/>
+      <ellipse cx="49" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <ellipse cx="71" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <circle cx="50.5" cy="64" r="5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="64" r="5" fill="#1C0C06"/>
+      <circle cx="52.2" cy="61.5" r="1.7" fill="white"/>
+      <circle cx="74.2" cy="61.5" r="1.7" fill="white"/>
+    </svg>
+  </div>
+
+  <div class="app-icon app-icon-sm" style="width:48px;height:48px;">
+    <svg width="48" height="48" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg48" x1="0" y1="0" x2="0.6" y2="1">
+          <stop offset="0%" stop-color="#2A1610"/>
+          <stop offset="100%" stop-color="#180C08"/>
+        </linearGradient>
+        <radialGradient id="body48" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#E8A88A"/>
+          <stop offset="45%"  stop-color="#B85840"/>
+          <stop offset="100%" stop-color="#7A2E1C"/>
+        </radialGradient>
+        <radialGradient id="ear48" cx="38%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#D4957A"/>
+          <stop offset="100%" stop-color="#9A3E28"/>
+        </radialGradient>
+      </defs>
+      <rect width="120" height="120" fill="url(#bg48)"/>
+      <ellipse cx="33" cy="24" rx="9" ry="13" fill="url(#ear48)" transform="rotate(-18 33 24)"/>
+      <ellipse cx="87" cy="24" rx="9" ry="13" fill="url(#ear48)" transform="rotate(18 87 24)"/>
+      <circle cx="60" cy="67" r="36" fill="url(#body48)"/>
+      <ellipse cx="49" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <ellipse cx="71" cy="63" rx="8.5" ry="9.5" fill="white"/>
+      <circle cx="50.5" cy="64" r="5" fill="#1C0C06"/>
+      <circle cx="72.5" cy="64" r="5" fill="#1C0C06"/>
+    </svg>
+  </div>
+
+</div>
+
+</body>
+</html>
