@@ -231,6 +231,8 @@ private struct ServerEditSheet: View {
                             .foregroundStyle(Theme.textSecondary)
                         TextField("https://your-server.ngrok.io", text: $url)
                             .font(Theme.body)
+                            .foregroundStyle(Theme.textPrimary)
+                            .tint(Theme.accent)
                             .textContentType(.URL)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)

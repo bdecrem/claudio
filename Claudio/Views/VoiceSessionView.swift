@@ -92,11 +92,11 @@ struct VoiceSessionView: View {
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 52, height: 52)
-                            .background(Color.red, in: Circle())
+                            .background(Color(red: 0.75, green: 0.28, blue: 0.25), in: Circle())
                     }
                 }
-                .padding(.horizontal, Theme.spacing * 3)
-                .padding(.bottom, Theme.spacing * 4)
+                .padding(.trailing, 36)
+                .padding(.bottom, 48)
             }
         }
         .preferredColorScheme(.dark)
