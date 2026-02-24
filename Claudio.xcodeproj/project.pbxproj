@@ -24,6 +24,7 @@
 		B10000010000000000000001 /* EVIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* EVIService.swift */; };
 		B10000010000000000000002 /* VoiceSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* VoiceSessionView.swift */; };
 		B10000010000000000000003 /* Hume in Frameworks */ = {isa = PBXBuildFile; productRef = C20000010000000000000001 /* Hume */; };
+		D10000010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D10000010000000000000002 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +46,7 @@
 		A30000010000000000000001 /* Claudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Claudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B20000010000000000000001 /* EVIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EVIService.swift; sourceTree = "<group>"; };
 		B20000010000000000000002 /* VoiceSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionView.swift; sourceTree = "<group>"; };
+		D10000010000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 			children = (
 				A20000010000000000000001 /* ClaudioApp.swift */,
 				A2000001000000000000000D /* Info.plist */,
+				D10000010000000000000002 /* PrivacyInfo.xcprivacy */,
 				A2000001000000000000000F /* Assets.xcassets */,
 				A50000010000000000000003 /* Models */,
 				A50000010000000000000004 /* Views */,
@@ -196,6 +199,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000001000000000000000E /* Assets.xcassets in Resources */,
+				D10000010000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -300,11 +304,11 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.claudio.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -328,11 +332,11 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.claudio.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

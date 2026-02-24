@@ -1,0 +1,86 @@
+============================================
+CLAUDIO — APP STORE METADATA
+============================================
+
+APP NAME: Claudio
+SUBTITLE: Voice & Text AI Client
+BUNDLE ID: com.claudio.app
+PRICE: Free
+AGE RATING: 17+
+CATEGORY (Primary): Productivity
+CATEGORY (Secondary): Utilities
+
+--------------------------------------------
+PROMOTIONAL TEXT (170 chars, can change anytime)
+--------------------------------------------
+Talk to your AI agents by voice or text. Connect to your own server — no account needed, no data collected.
+
+--------------------------------------------
+DESCRIPTION (4000 chars max)
+--------------------------------------------
+Claudio is a minimal, beautiful client for talking to your AI agents — by voice or by text.
+
+Connect to any OpenClaw-compatible server and start a conversation. Claudio handles voice input, real-time transcription, and text-to-speech so you can have natural, hands-free conversations with your AI.
+
+HOW IT WORKS
+• Enter your server URL in Settings — that's it
+• Choose from your server's available agents
+• Type a message or tap the voice button for a full voice conversation
+• Voice sessions show a live transcript and play back AI responses as speech
+
+FEATURES
+• Voice mode with real-time speech-to-text and text-to-speech
+• Full-screen voice sessions with live scrolling transcript
+• Clean, dark interface designed for focus
+• Works with any OpenClaw-compatible backend
+• No account required — no sign-up, no login
+• Zero data collection — your conversations stay on your device and your server
+
+PRIVACY FIRST
+Claudio collects no data whatsoever. No analytics, no tracking, no ads. Your server URL is stored locally on your device. Conversations are between you and your server.
+
+REQUIREMENTS
+• Claudio is a client app — you need access to a compatible AI server
+• The server handles all AI processing; Claudio is the interface
+
+--------------------------------------------
+KEYWORDS (100 chars max, comma-separated)
+--------------------------------------------
+AI,voice,chat,agent,assistant,speech,OpenClaw,LLM,self-hosted,conversation
+
+--------------------------------------------
+WHAT'S NEW (for v1.0)
+--------------------------------------------
+Initial release.
+
+--------------------------------------------
+SUPPORT URL
+--------------------------------------------
+https://claudio.la
+
+--------------------------------------------
+PRIVACY POLICY URL
+--------------------------------------------
+https://claudio.la/privacy
+
+--------------------------------------------
+TERMS OF SERVICE URL (EULA)
+--------------------------------------------
+https://claudio.la/terms
+
+--------------------------------------------
+COPYRIGHT
+--------------------------------------------
+© 2026 Kochito Labs
+
+--------------------------------------------
+CONTACT EMAIL (for App Review)
+--------------------------------------------
+hello@kochi.to
+
+--------------------------------------------
+APP REVIEW NOTES
+--------------------------------------------
+Claudio is a client app that connects to user-provided AI server URLs. To test, you will need a server running an OpenClaw-compatible backend. The app itself does not include AI models or process data — it sends messages to the configured server and displays responses.
+
+If you need a test server URL for review, please contact us at hello@kochi.to.
