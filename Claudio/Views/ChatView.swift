@@ -184,13 +184,9 @@ struct ChatView: View {
         }
         chatService.stopSpeaking()
 
-        // Wire callbacks so voice transcripts appear in chat history
-        eviService.onUserMessage = { [chatService] text in
-            chatService.appendVoiceMessage(role: .user, content: text)
-        }
-        eviService.onAssistantMessage = { [chatService] text in
-            chatService.appendVoiceMessage(role: .assistant, content: text)
-        }
+        // No real-time callbacks — we transfer all messages on dismiss
+        eviService.onUserMessage = nil
+        eviService.onAssistantMessage = nil
 
         showVoiceSession = true
 
@@ -210,6 +206,15 @@ struct ChatView: View {
     }
 
     private func endVoiceSession() {
+        // Flush any in-flight text (mid-speech or mid-response)
+        eviService.flushPending()
+
+        // Transfer ALL session messages to the main chat
+        for msg in eviService.sessionMessages {
+            let role: Message.Role = msg.role == "user" ? .user : .assistant
+            chatService.appendVoiceMessage(role: role, content: msg.content)
+        }
+
         showVoiceSession = false
         Task {
             await eviService.disconnect()

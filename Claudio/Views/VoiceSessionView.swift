@@ -10,7 +10,78 @@ struct VoiceSessionView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Header with close button
+                // Conversation transcript — starts at top, scrolls down
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: Theme.spacing * 1.5) {
+                            // All finalized messages
+                            ForEach(eviService.sessionMessages.indices, id: \.self) { i in
+                                let msg = eviService.sessionMessages[i]
+                                voiceMessageBubble(role: msg.role, content: msg.content)
+                                    .id("msg-\(i)")
+                            }
+
+                            // Live in-progress text (interim speech or streaming response)
+                            if !eviService.liveText.isEmpty {
+                                voiceMessageBubble(
+                                    role: eviService.liveRole,
+                                    content: eviService.liveText
+                                )
+                                .opacity(0.6)
+                                .id("live")
+                            }
+                        }
+                        .padding(.vertical, Theme.spacing * 2)
+                    }
+                    .onChange(of: eviService.sessionMessages.count) {
+                        let target = eviService.liveText.isEmpty
+                            ? "msg-\(eviService.sessionMessages.count - 1)"
+                            : "live"
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(target, anchor: .bottom)
+                        }
+                    }
+                    .onChange(of: eviService.liveText) {
+                        if !eviService.liveText.isEmpty {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo("live", anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+
+                // Voice orb + state indicator
+                switch eviService.state {
+                case .connecting:
+                    connectingView
+                        .padding(.bottom, Theme.spacing * 2)
+
+                case .error(let message):
+                    errorView(message: message)
+                        .padding(.bottom, Theme.spacing * 2)
+
+                case .listening, .thinking, .speaking:
+                    VoiceOrb(
+                        isListening: eviService.state == .listening,
+                        audioLevel: eviService.audioLevel,
+                        transcript: "",
+                        onTap: {}
+                    )
+                    .frame(height: 200)
+
+                case .idle:
+                    connectingView
+                        .padding(.bottom, Theme.spacing * 2)
+                }
+
+                // State label
+                stateLabel
+                    .padding(.bottom, Theme.spacing * 4)
+            }
+
+            // Stop button — bottom right
+            VStack {
+                Spacer()
                 HStack {
                     Spacer()
                     Button {
@@ -18,41 +89,40 @@ struct VoiceSessionView: View {
                         onDismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Theme.textSecondary)
-                            .frame(width: 36, height: 36)
-                            .background(Theme.surface, in: Circle())
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 52, height: 52)
+                            .background(Color.red, in: Circle())
                     }
                 }
-                .padding(.horizontal, Theme.spacing * 2)
-                .padding(.top, Theme.spacing * 2)
-
-                Spacer()
-
-                // Main content
-                switch eviService.state {
-                case .connecting:
-                    connectingView
-
-                case .error(let message):
-                    errorView(message: message)
-
-                case .listening, .thinking, .speaking:
-                    voiceActiveView
-
-                case .idle:
-                    // Shouldn't normally be visible, but handle gracefully
-                    connectingView
-                }
-
-                Spacer()
-
-                // State label
-                stateLabel
-                    .padding(.bottom, Theme.spacing * 6)
+                .padding(.horizontal, Theme.spacing * 3)
+                .padding(.bottom, Theme.spacing * 4)
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Message bubble matching main chat style
+
+    private func voiceMessageBubble(role: String, content: String) -> some View {
+        HStack {
+            if role == "user" { Spacer(minLength: 60) }
+
+            Text(content)
+                .font(Theme.body)
+                .foregroundStyle(Theme.textPrimary)
+                .padding(.horizontal, Theme.spacing * 2)
+                .padding(.vertical, Theme.spacing * 1.5)
+                .background(
+                    role == "user"
+                        ? Theme.accent.opacity(0.15)
+                        : Theme.surface,
+                    in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                )
+
+            if role == "assistant" { Spacer(minLength: 60) }
+        }
+        .padding(.horizontal, Theme.spacing * 2)
     }
 
     // MARK: - Sub-views
@@ -88,15 +158,6 @@ struct VoiceSessionView: View {
             HapticsManager.tap()
             onDismiss()
         }
-    }
-
-    private var voiceActiveView: some View {
-        VoiceOrb(
-            isListening: eviService.state == .listening,
-            audioLevel: eviService.audioLevel,
-            transcript: eviService.transcript,
-            onTap: {}
-        )
     }
 
     @ViewBuilder

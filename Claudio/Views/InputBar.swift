@@ -53,20 +53,6 @@ struct InputBar: View {
 
             // Input row — always present
             HStack(spacing: Theme.spacing) {
-                // Voice mode toggle
-                Button {
-                    onToggleVoice()
-                } label: {
-                    Image(systemName: voiceSessionActive ? "waveform.circle.fill" : "waveform")
-                        .font(.system(size: voiceSessionActive ? 18 : 14))
-                        .foregroundStyle(voiceSessionActive ? Theme.accent : voiceEnabled ? Theme.accent : Theme.textSecondary.opacity(0.5))
-                        .frame(width: 36, height: 36)
-                        .background(
-                            (voiceEnabled || voiceSessionActive) ? Theme.accent.opacity(0.15) : Color.clear,
-                            in: Circle()
-                        )
-                }
-
                 // Text field
                 HStack(spacing: Theme.spacing) {
                     TextField("Message", text: $text)
@@ -99,6 +85,17 @@ struct InputBar: View {
                 } else if voiceEnabled {
                     micButton
                         .transition(.scale.combined(with: .opacity))
+                }
+
+                // Voice mode toggle (right side)
+                Button {
+                    onToggleVoice()
+                } label: {
+                    Image(systemName: voiceSessionActive ? "waveform.circle.fill" : "waveform")
+                        .font(.system(size: voiceSessionActive ? 22 : 17))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.accent, in: Circle())
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: text.isEmpty)

@@ -21,7 +21,17 @@ final class EVIService {
 
     var state: State = .idle
     var audioLevel: Float = 0
-    var transcript = ""
+
+    /// The current in-progress text (interim user speech or streaming assistant response).
+    var liveText = ""
+    /// Role of the current in-progress text ("user" or "assistant").
+    var liveRole = "user"
+
+    /// All finalized messages from this voice session.
+    var sessionMessages: [(role: String, content: String)] = []
+
+    // Legacy — kept for quick-voice InputBar transcript display
+    var transcript: String { liveText }
 
     var onUserMessage: ((String) -> Void)?
     var onAssistantMessage: ((String) -> Void)?
@@ -118,6 +128,22 @@ final class EVIService {
         }
     }
 
+    /// Flush any in-flight text into sessionMessages before disconnect.
+    @MainActor
+    func flushPending() {
+        // Flush pending assistant response
+        if !pendingAssistantText.isEmpty {
+            sessionMessages.append((role: "assistant", content: pendingAssistantText))
+            pendingAssistantText = ""
+        }
+        // Flush any live user text that wasn't finalized (e.g. user hit stop mid-speech)
+        let trimmed = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty && liveRole == "user" {
+            sessionMessages.append((role: "user", content: trimmed))
+        }
+        liveText = ""
+    }
+
     @MainActor
     func disconnect() async {
         stateCancellable?.cancel()
@@ -130,9 +156,11 @@ final class EVIService {
         voiceProvider = nil
         humeClient = nil
         _delegate = nil
-        transcript = ""
+        liveText = ""
+        liveRole = "user"
         audioLevel = 0
         pendingAssistantText = ""
+        sessionMessages = []
         state = .idle
         log.info("EVI disconnected")
     }
@@ -190,22 +218,25 @@ final class EVIService {
     private func handleEvent(_ event: SubscribeEvent) {
         switch event {
         case .userMessage(let msg):
+            liveRole = "user"
             if let content = msg.message.content {
-                transcript = content
+                liveText = content
             }
             if !msg.interim {
-                // Final user transcript
-                let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+                let text = liveText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty {
+                    sessionMessages.append((role: "user", content: text))
                     onUserMessage?(text)
                 }
+                liveText = ""
                 state = .thinking
-                transcript = ""
             }
 
         case .assistantMessage(let msg):
+            liveRole = "assistant"
             if let content = msg.message.content {
                 pendingAssistantText = content
+                liveText = content
             }
 
         case .audioOutput:
@@ -216,17 +247,23 @@ final class EVIService {
         case .userInterruption:
             // User interrupted — SDK stops playback automatically
             if !pendingAssistantText.isEmpty {
+                sessionMessages.append((role: "assistant", content: pendingAssistantText))
                 onAssistantMessage?(pendingAssistantText)
                 pendingAssistantText = ""
             }
+            liveText = ""
+            liveRole = "user"
             state = .listening
             audioLevel = 0
 
         case .assistantEnd:
             if !pendingAssistantText.isEmpty {
+                sessionMessages.append((role: "assistant", content: pendingAssistantText))
                 onAssistantMessage?(pendingAssistantText)
                 pendingAssistantText = ""
             }
+            liveText = ""
+            liveRole = "user"
             state = .listening
             audioLevel = 0
 
