@@ -1,5 +1,5 @@
 {
-  "instruction": "Build me a funky piece of art as a web page with wild CSS animations and surprise me",
-  "date": "2026-02-24",
-  "signature": "a4bb2534c891b3a146dd19887f3fd100de7699952ff8892fe034b7097ee30667cc714a3cd754e49c1d3994e7d72ee8274fad361a8dc07e64face28f67f342503"
+  "instruction": "Build a funky art piece as a single HTML file with wild CSS animations. Publish it with `npx surge --project ./folder --domain random-name.surge.sh` and share the URL.",
+  "date": "2026-02-25",
+  "signature": "ff83f48f16588f91edc759ff379c655a321dccf41c55fffe1efc3883b80eec68ee266a3240faf5943975f26dfb732293dc925957c5392af2a316fe8a08bfa201"
 }
