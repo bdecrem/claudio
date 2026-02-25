@@ -47,6 +47,7 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        .buttonStyle(.plain)
                         .listRowBackground(isActive ? Theme.accent.opacity(0.08) : Theme.surface)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if !isActive {
@@ -245,6 +246,8 @@ private struct ServerEditSheet: View {
                             .foregroundStyle(Theme.textSecondary)
                         SecureField("Bearer token", text: $token)
                             .font(Theme.body)
+                            .foregroundStyle(Theme.textPrimary)
+                            .tint(Theme.accent)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                     }

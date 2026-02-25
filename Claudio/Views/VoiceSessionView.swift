@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct VoiceSessionView: View {
-    let eviService: EVIService
+    let voiceService: VoiceService
     let onDismiss: () -> Void
 
     var body: some View {
@@ -10,22 +10,20 @@ struct VoiceSessionView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Conversation transcript — starts at top, scrolls down
+                // Conversation transcript
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: Theme.spacing * 1.5) {
-                            // All finalized messages
-                            ForEach(eviService.sessionMessages.indices, id: \.self) { i in
-                                let msg = eviService.sessionMessages[i]
+                            ForEach(voiceService.sessionMessages.indices, id: \.self) { i in
+                                let msg = voiceService.sessionMessages[i]
                                 voiceMessageBubble(role: msg.role, content: msg.content)
                                     .id("msg-\(i)")
                             }
 
-                            // Live in-progress text (interim speech or streaming response)
-                            if !eviService.liveText.isEmpty {
+                            if !voiceService.liveText.isEmpty {
                                 voiceMessageBubble(
-                                    role: eviService.liveRole,
-                                    content: eviService.liveText
+                                    role: voiceService.state == .listening ? "user" : "assistant",
+                                    content: voiceService.liveText
                                 )
                                 .opacity(0.6)
                                 .id("live")
@@ -33,16 +31,16 @@ struct VoiceSessionView: View {
                         }
                         .padding(.vertical, Theme.spacing * 2)
                     }
-                    .onChange(of: eviService.sessionMessages.count) {
-                        let target = eviService.liveText.isEmpty
-                            ? "msg-\(eviService.sessionMessages.count - 1)"
+                    .onChange(of: voiceService.sessionMessages.count) {
+                        let target = voiceService.liveText.isEmpty
+                            ? "msg-\(voiceService.sessionMessages.count - 1)"
                             : "live"
                         withAnimation(.easeOut(duration: 0.2)) {
                             proxy.scrollTo(target, anchor: .bottom)
                         }
                     }
-                    .onChange(of: eviService.liveText) {
-                        if !eviService.liveText.isEmpty {
+                    .onChange(of: voiceService.liveText) {
+                        if !voiceService.liveText.isEmpty {
                             withAnimation(.easeOut(duration: 0.2)) {
                                 proxy.scrollTo("live", anchor: .bottom)
                             }
@@ -50,20 +48,16 @@ struct VoiceSessionView: View {
                     }
                 }
 
-                // Voice orb + state indicator
-                switch eviService.state {
-                case .connecting:
-                    connectingView
-                        .padding(.bottom, Theme.spacing * 2)
-
+                // Voice orb + state
+                switch voiceService.state {
                 case .error(let message):
                     errorView(message: message)
                         .padding(.bottom, Theme.spacing * 2)
 
-                case .listening, .thinking, .speaking:
+                case .listening, .sending, .speaking:
                     VoiceOrb(
-                        isListening: eviService.state == .listening,
-                        audioLevel: eviService.audioLevel,
+                        isListening: voiceService.state == .listening,
+                        audioLevel: voiceService.audioLevel,
                         transcript: "",
                         onTap: {}
                     )
@@ -74,12 +68,11 @@ struct VoiceSessionView: View {
                         .padding(.bottom, Theme.spacing * 2)
                 }
 
-                // State label
                 stateLabel
                     .padding(.bottom, Theme.spacing * 4)
             }
 
-            // Stop button — bottom right
+            // Stop button
             VStack {
                 Spacer()
                 HStack {
@@ -102,8 +95,6 @@ struct VoiceSessionView: View {
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Message bubble matching main chat style
-
     private func voiceMessageBubble(role: String, content: String) -> some View {
         HStack {
             if role == "user" { Spacer(minLength: 60) }
@@ -125,14 +116,12 @@ struct VoiceSessionView: View {
         .padding(.horizontal, Theme.spacing * 2)
     }
 
-    // MARK: - Sub-views
-
     private var connectingView: some View {
         VStack(spacing: Theme.spacing * 2) {
             ProgressView()
                 .tint(Theme.accent)
                 .scaleEffect(1.5)
-            Text("Connecting...")
+            Text("Starting...")
                 .font(Theme.body)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -150,7 +139,7 @@ struct VoiceSessionView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.spacing * 4)
 
-            Text("Tap to reconnect")
+            Text("Tap to close")
                 .font(Theme.caption)
                 .foregroundStyle(Theme.accent.opacity(0.6))
         }
@@ -162,14 +151,14 @@ struct VoiceSessionView: View {
 
     @ViewBuilder
     private var stateLabel: some View {
-        switch eviService.state {
+        switch voiceService.state {
         case .listening:
             Text("Listening")
                 .font(.system(.body, design: .rounded, weight: .medium))
                 .foregroundStyle(Theme.accent)
                 .transition(.opacity)
 
-        case .thinking:
+        case .sending:
             HStack(spacing: Theme.spacing) {
                 ProgressView()
                     .tint(Theme.accent)

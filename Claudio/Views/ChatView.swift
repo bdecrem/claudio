@@ -3,7 +3,7 @@ import SwiftUI
 struct ChatView: View {
     @State private var chatService = ChatService()
     @State private var speechRecognizer = SpeechRecognizer()
-    @State private var eviService = EVIService()
+    @State private var voiceService = VoiceService()
     @State private var messageText = ""
     @State private var voiceEnabled = false
     @State private var showSettings = false
@@ -15,7 +15,6 @@ struct ChatView: View {
                 .ignoresSafeArea()
 
             if !chatService.hasServer {
-                // First-launch: no server configured
                 VStack(spacing: Theme.spacing * 3) {
                     Spacer()
 
@@ -109,7 +108,7 @@ struct ChatView: View {
                         }
                     }
 
-                    // Input — always text field, voice is a toggle
+                    // Input
                     InputBar(
                         text: $messageText,
                         voiceEnabled: voiceEnabled,
@@ -147,9 +146,11 @@ struct ChatView: View {
         }
         .fullScreenCover(isPresented: $showVoiceSession) {
             VoiceSessionView(
-                eviService: eviService,
+                voiceService: voiceService,
                 onDismiss: { endVoiceSession() }
             )
+            .background(Theme.background)
+            .preferredColorScheme(.dark)
         }
         .onAppear {
             speechRecognizer.requestAuthorization()
@@ -178,46 +179,32 @@ struct ChatView: View {
     private func startVoiceSession() {
         guard let server = chatService.selectedServer else { return }
 
-        // Stop any active speech recognition
         if speechRecognizer.isListening {
             _ = speechRecognizer.stopListening()
         }
         chatService.stopSpeaking()
 
-        // No real-time callbacks — we transfer all messages on dismiss
-        eviService.onUserMessage = nil
-        eviService.onAssistantMessage = nil
-
         showVoiceSession = true
 
-        Task {
-            do {
-                let config = try await eviService.fetchConfig(
-                    serverURL: server.url,
-                    token: server.token
-                )
-                await eviService.connect(config: config)
-            } catch {
-                await MainActor.run {
-                    eviService.state = .error("Could not connect to voice service.")
-                }
-            }
-        }
+        voiceService.start(
+            serverURL: server.url,
+            token: server.token,
+            agentId: chatService.selectedAgentId,
+            chatHistory: chatService.messages.map { $0.apiRepresentation },
+            speechRecognizer: speechRecognizer
+        )
     }
 
     private func endVoiceSession() {
-        // Flush any in-flight text (mid-speech or mid-response)
-        eviService.flushPending()
+        voiceService.flushPending()
 
-        // Transfer ALL session messages to the main chat
-        for msg in eviService.sessionMessages {
+        for msg in voiceService.sessionMessages {
             let role: Message.Role = msg.role == "user" ? .user : .assistant
             chatService.appendVoiceMessage(role: role, content: msg.content)
         }
 
         showVoiceSession = false
-        Task {
-            await eviService.disconnect()
-        }
+        voiceService.stop()
+        voiceService.sessionMessages = []
     }
 }
