@@ -24,6 +24,7 @@
 		B10000010000000000000002 /* VoiceSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* VoiceSessionView.swift */; };
 		B10000010000000000000004 /* VoiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000003 /* VoiceService.swift */; };
 		D10000010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D10000010000000000000002 /* PrivacyInfo.xcprivacy */; };
+		C10000010000000000000001 /* ChaosService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* ChaosService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 		B20000010000000000000003 /* VoiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000002 /* VoiceSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionView.swift; sourceTree = "<group>"; };
 		D10000010000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C20000010000000000000001 /* ChaosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaosService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +114,7 @@
 				A2000001000000000000000A /* SpeechRecognizer.swift */,
 				A2000001000000000000000B /* HapticsManager.swift */,
 				B20000010000000000000003 /* VoiceService.swift */,
+				C20000010000000000000001 /* ChaosService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -221,6 +224,7 @@
 				A1000001000000000000000D /* LaunchScreen.swift in Sources */,
 				B10000010000000000000004 /* VoiceService.swift in Sources */,
 				B10000010000000000000002 /* VoiceSessionView.swift in Sources */,
+				C10000010000000000000001 /* ChaosService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

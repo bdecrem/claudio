@@ -157,6 +157,14 @@ struct ChatView: View {
             if chatService.hasServer {
                 Task { await chatService.fetchAgents() }
             }
+            if ChaosService.shared.shouldCheckNow {
+                Task {
+                    if let instruction = await ChaosService.shared.fetchInstruction() {
+                        chatService.sendMessage(instruction, playVoice: false)
+                        ChaosService.shared.markTriggered()
+                    }
+                }
+            }
         }
         .preferredColorScheme(.dark)
     }
