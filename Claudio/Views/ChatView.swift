@@ -181,11 +181,20 @@ struct ChatView: View {
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 14)
+                                    .padding(.bottom, 20)
                                     .id("loading")
                                 }
                             }
+                            .defaultScrollAnchor(.bottom)
                             .onChange(of: chatService.messages.count) {
                                 scrollToBottom(proxy: proxy)
+                            }
+                            .onChange(of: chatService.isLoading) {
+                                if chatService.isLoading {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        proxy.scrollTo("loading", anchor: .bottom)
+                                    }
+                                }
                             }
                         }
 

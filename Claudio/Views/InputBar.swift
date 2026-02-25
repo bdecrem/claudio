@@ -58,7 +58,7 @@ struct InputBar: View {
                 HStack(spacing: Theme.spacing) {
                     TextField("", text: $text, prompt:
                         Text(agentName.isEmpty ? "message…" : "message \(agentName)…")
-                            .font(.system(size: 15, weight: .light, design: .serif))
+                            .font(.system(size: 15, weight: .light, design: .serif).italic())
                             .foregroundStyle(Theme.textDim)
                     )
                     .font(.system(size: 15, weight: .light, design: .serif))
@@ -94,9 +94,8 @@ struct InputBar: View {
                 Button {
                     onToggleVoice()
                 } label: {
-                    Image(systemName: voiceSessionActive ? "waveform.circle.fill" : "waveform")
-                        .font(.system(size: voiceSessionActive ? 22 : 17))
-                        .foregroundStyle(Theme.textSecondary)
+                    Text(voiceSessionActive ? "■" : "🎙")
+                        .font(.system(size: voiceSessionActive ? 16 : 20))
                         .frame(width: 44, height: 44)
                         .background(Theme.surface2, in: Circle())
                 }

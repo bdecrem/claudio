@@ -385,7 +385,7 @@ struct SettingsView: View {
                 dangerousTogglePending = false
             }
         } message: {
-            Text("This will skip all permission prompts. Only do this if you know what you're doing.")
+            Text("May introduce unexpected behavior. Claudio will not ask. Claudio will act.")
         }
         .preferredColorScheme(.dark)
     }
