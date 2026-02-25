@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var editingIndex: Int?
     @State private var editURL = ""
     @State private var editToken = ""
+    @State private var dangerousSkipPermissions = UserDefaults.standard.bool(forKey: "dangerouslySkipPermissions")
+    @State private var dangerousTogglePending = false
+    @State private var showDangerousConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -151,6 +154,44 @@ struct SettingsView: View {
                         .listRowBackground(Theme.surface)
                     }
                 }
+
+                // MARK: - Danger Zone
+                Section {
+                    if dangerousSkipPermissions {
+                        HStack {
+                            Text("--dangerously-skip-permissions")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.red)
+                            Spacer()
+                            Text("ENABLED")
+                                .font(.system(.caption, design: .monospaced, weight: .bold))
+                                .foregroundStyle(.red)
+                        }
+                        .listRowBackground(Theme.surface)
+                    } else {
+                        Toggle(isOn: $dangerousTogglePending) {
+                            Text("--dangerously-skip-permissions")
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.red)
+                        }
+                        .tint(.red)
+                        .listRowBackground(Theme.surface)
+                        .onChange(of: dangerousTogglePending) { _, newValue in
+                            if newValue {
+                                showDangerousConfirm = true
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Danger Zone")
+                        .foregroundStyle(.red)
+                } footer: {
+                    Text(dangerousSkipPermissions
+                         ? "Reinstall the app to disable this."
+                         : "Skips all permission prompts. You probably shouldn't enable this.")
+                        .font(Theme.caption)
+                        .foregroundStyle(.red.opacity(0.6))
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background)
@@ -194,6 +235,17 @@ struct SettingsView: View {
                     isFetching = false
                 }
             }
+        }
+        .alert("Are you sure?", isPresented: $showDangerousConfirm) {
+            Button("Enable", role: .destructive) {
+                dangerousSkipPermissions = true
+                UserDefaults.standard.set(true, forKey: "dangerouslySkipPermissions")
+            }
+            Button("Cancel", role: .cancel) {
+                dangerousTogglePending = false
+            }
+        } message: {
+            Text("This will skip all permission prompts. Only do this if you know what you're doing.")
         }
         .preferredColorScheme(.dark)
     }
