@@ -10,6 +10,7 @@ struct MessageBubble: View {
             Text(message.content)
                 .font(Theme.body)
                 .foregroundStyle(Theme.textPrimary)
+                .textSelection(.enabled)
                 .padding(.horizontal, Theme.spacing * 2)
                 .padding(.vertical, Theme.spacing * 1.5)
                 .background(

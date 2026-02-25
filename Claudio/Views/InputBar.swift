@@ -72,17 +72,8 @@ struct InputBar: View {
                 .padding(.vertical, Theme.spacing * 1.25)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
 
-                // Mic (hold to speak) or Send
-                if !text.isEmpty {
-                    Button(action: onSend) {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.background)
-                            .frame(width: 36, height: 36)
-                            .background(Theme.accent, in: Circle())
-                    }
-                    .transition(.scale.combined(with: .opacity))
-                } else if voiceEnabled {
+                // Mic (hold to speak)
+                if text.isEmpty && voiceEnabled {
                     micButton
                         .transition(.scale.combined(with: .opacity))
                 }
