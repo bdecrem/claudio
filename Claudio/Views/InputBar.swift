@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InputBar: View {
     @Binding var text: String
+    var agentName: String = ""
     let voiceEnabled: Bool
     let voiceSessionActive: Bool
     let isListening: Bool
@@ -21,7 +22,7 @@ struct InputBar: View {
             // Live transcript while recording
             if isListening, !transcript.isEmpty {
                 Text(transcript)
-                    .font(Theme.body)
+                    .font(.system(size: 15, weight: .light, design: .serif))
                     .foregroundStyle(Theme.textPrimary.opacity(0.6))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, Theme.spacing * 2)
@@ -51,26 +52,37 @@ struct InputBar: View {
                 .transition(.opacity)
             }
 
-            // Input row — always present
+            // Input row
             HStack(spacing: Theme.spacing) {
-                // Text field
+                // Text field with border
                 HStack(spacing: Theme.spacing) {
-                    TextField("Message", text: $text)
-                        .font(Theme.body)
-                        .foregroundStyle(Theme.textPrimary)
-                        .focused($isFocused)
-                        .tint(Theme.accent)
-                        .disabled(isListening)
-                        .submitLabel(.send)
-                        .onSubmit {
-                            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                onSend()
-                            }
+                    TextField("", text: $text, prompt:
+                        Text(agentName.isEmpty ? "message…" : "message \(agentName)…")
+                            .font(.system(size: 15, weight: .light, design: .serif))
+                            .foregroundStyle(Theme.textDim)
+                    )
+                    .font(.system(size: 15, weight: .light, design: .serif))
+                    .foregroundStyle(Theme.textPrimary)
+                    .focused($isFocused)
+                    .tint(Theme.accent)
+                    .disabled(isListening)
+                    .submitLabel(.return)
+                    .onSubmit {
+                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            onSend()
                         }
+                    }
                 }
-                .padding(.horizontal, Theme.spacing * 1.5)
-                .padding(.vertical, Theme.spacing * 1.25)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(
+                            isFocused ? Theme.accent.opacity(0.25) : Theme.border,
+                            lineWidth: 1
+                        )
+                )
 
                 // Mic (hold to speak)
                 if text.isEmpty && voiceEnabled {
@@ -78,22 +90,39 @@ struct InputBar: View {
                         .transition(.scale.combined(with: .opacity))
                 }
 
-                // Voice mode toggle (right side)
+                // Voice mode toggle
                 Button {
                     onToggleVoice()
                 } label: {
                     Image(systemName: voiceSessionActive ? "waveform.circle.fill" : "waveform")
                         .font(.system(size: voiceSessionActive ? 22 : 17))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.surface2, in: Circle())
+                }
+
+                // Send button
+                Button {
+                    if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onSend()
+                    }
+                } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.background)
                         .frame(width: 44, height: 44)
                         .background(Theme.accent, in: Circle())
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: text.isEmpty)
         }
-        .padding(.horizontal, Theme.spacing * 2)
-        .padding(.vertical, Theme.spacing * 1.5)
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
         .background(Theme.background)
+        .overlay(alignment: .top) {
+            Theme.border.frame(height: 1)
+        }
     }
 
     private var micButton: some View {

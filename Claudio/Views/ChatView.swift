@@ -44,73 +44,178 @@ struct ChatView: View {
             } else {
                 VStack(spacing: 0) {
                     // Header
-                    HStack {
-                        AgentPicker(
-                            selected: Binding(
-                                get: { chatService.selectedAgent },
-                                set: { chatService.selectedAgent = $0 }
-                            ),
-                            agents: chatService.agents
-                        )
-                        Spacer()
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Theme.textSecondary)
+                    VStack(spacing: 0) {
+                        HStack {
+                            Spacer()
+                                .frame(width: 32)
+
+                            Spacer()
+
+                            // Centered agent name
+                            VStack(spacing: 2) {
+                                Text(currentAgentName)
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(Theme.textPrimary)
+
+                                HStack(spacing: 5) {
+                                    Circle()
+                                        .fill(Theme.green)
+                                        .frame(width: 6, height: 6)
+                                        .shadow(color: Theme.green.opacity(0.6), radius: 3)
+                                        .modifier(PulseOpacity())
+                                    Text("online")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(Theme.textSecondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                showSettings = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .padding(6)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
+
+                        Theme.border.frame(height: 1)
+                    }
+
+                    // Agent switcher pills
+                    if chatService.agents.count > 1 {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            AgentPicker(
+                                selected: Binding(
+                                    get: { chatService.selectedAgent },
+                                    set: { chatService.selectedAgent = $0 }
+                                ),
+                                agents: chatService.agents
+                            )
+                            .padding(.horizontal, 16)
+                        }
+                        .padding(.vertical, 8)
+                        .overlay(alignment: .bottom) {
+                            Color.white.opacity(0.03).frame(height: 1)
                         }
                     }
-                    .padding(.horizontal, Theme.spacing * 2)
-                    .padding(.vertical, Theme.spacing)
 
-                    // Messages
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            if chatService.messages.isEmpty {
-                                VStack(spacing: Theme.spacing * 2) {
-                                    Spacer(minLength: 100)
-                                    Text("claudio")
-                                        .font(.system(.largeTitle, design: .rounded, weight: .light))
-                                        .foregroundStyle(Theme.textSecondary.opacity(0.4))
-                                    Text("start a conversation")
-                                        .font(Theme.caption)
-                                        .foregroundStyle(Theme.textSecondary.opacity(0.3))
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 120)
-                            } else {
-                                LazyVStack(spacing: Theme.spacing * 1.5) {
-                                    ForEach(chatService.messages) { message in
-                                        MessageBubble(message: message)
-                                            .id(message.id)
+                    // Messages with fade edges
+                    ZStack {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                if chatService.messages.isEmpty {
+                                    VStack(spacing: Theme.spacing * 2) {
+                                        Spacer(minLength: 100)
+                                        Text("claudio")
+                                            .font(.system(.largeTitle, design: .rounded, weight: .light))
+                                            .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                                        Text("start a conversation")
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .foregroundStyle(Theme.textDim)
                                     }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 120)
+                                } else {
+                                    LazyVStack(spacing: 0) {
+                                        ForEach(chatService.messages) { message in
+                                            MessageBubble(
+                                                message: message,
+                                                agentName: message.role == .assistant ? currentAgentName : ""
+                                            )
+                                            .id(message.id)
+                                            .padding(.bottom, 12)
+                                        }
+                                    }
+                                    .padding(.vertical, 16)
                                 }
-                                .padding(.vertical, Theme.spacing * 2)
-                            }
 
-                            if chatService.isLoading {
-                                HStack(spacing: Theme.spacing) {
-                                    ProgressView()
-                                        .tint(Theme.accent)
-                                    Text("Thinking...")
-                                        .font(Theme.caption)
-                                        .foregroundStyle(Theme.textSecondary)
-                                    Spacer()
+                                if chatService.isLoading {
+                                    // Agent label above thinking bubble
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(Theme.green)
+                                                .frame(width: 5, height: 5)
+                                                .shadow(color: Theme.green.opacity(0.5), radius: 2)
+                                            Text(currentAgentName)
+                                                .font(.system(size: 10, design: .monospaced))
+                                                .foregroundStyle(Theme.textSecondary)
+                                        }
+                                        .padding(.leading, 4)
+
+                                        HStack(spacing: 10) {
+                                            ThinkingDots()
+                                            Text("working")
+                                                .font(.system(size: 11, design: .monospaced))
+                                                .foregroundStyle(Theme.textDim)
+                                                .italic()
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            UnevenRoundedRectangle(
+                                                topLeadingRadius: 18,
+                                                bottomLeadingRadius: 5,
+                                                bottomTrailingRadius: 18,
+                                                topTrailingRadius: 18,
+                                                style: .continuous
+                                            )
+                                            .fill(Theme.surface)
+                                        )
+                                        .overlay(
+                                            UnevenRoundedRectangle(
+                                                topLeadingRadius: 18,
+                                                bottomLeadingRadius: 5,
+                                                bottomTrailingRadius: 18,
+                                                topTrailingRadius: 18,
+                                                style: .continuous
+                                            )
+                                            .strokeBorder(Theme.border, lineWidth: 1)
+                                        )
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 14)
+                                    .id("loading")
                                 }
-                                .padding(.horizontal, Theme.spacing * 4)
-                                .padding(.vertical, Theme.spacing)
-                                .id("loading")
+                            }
+                            .onChange(of: chatService.messages.count) {
+                                scrollToBottom(proxy: proxy)
                             }
                         }
-                        .onChange(of: chatService.messages.count) {
-                            scrollToBottom(proxy: proxy)
+
+                        // Top fade
+                        VStack {
+                            LinearGradient(
+                                colors: [Theme.background, Theme.background.opacity(0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 28)
+                            .allowsHitTesting(false)
+
+                            Spacer()
+
+                            // Bottom fade
+                            LinearGradient(
+                                colors: [Theme.background.opacity(0), Theme.background],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 28)
+                            .allowsHitTesting(false)
                         }
                     }
 
                     // Input
                     InputBar(
                         text: $messageText,
+                        agentName: currentAgentName,
                         voiceEnabled: voiceEnabled,
                         voiceSessionActive: showVoiceSession,
                         isListening: speechRecognizer.isListening,
@@ -169,6 +274,13 @@ struct ChatView: View {
         .preferredColorScheme(.dark)
     }
 
+    private var currentAgentName: String {
+        if let agent = chatService.agents.first(where: { $0.id == chatService.selectedAgent }) {
+            return agent.name
+        }
+        return chatService.selectedAgent.isEmpty ? "Claudio" : chatService.selectedAgent
+    }
+
     private func scrollToBottom(proxy: ScrollViewProxy) {
         if let lastMessage = chatService.messages.last {
             withAnimation(.easeOut(duration: 0.2)) {
@@ -214,5 +326,46 @@ struct ChatView: View {
         showVoiceSession = false
         voiceService.stop()
         voiceService.sessionMessages = []
+    }
+}
+
+// MARK: - Thinking Dots
+
+private struct ThinkingDots: View {
+    @State private var animate = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Theme.textSecondary)
+                    .frame(width: 5, height: 5)
+                    .scaleEffect(animate ? 1.0 : 0.8)
+                    .opacity(animate ? 1.0 : 0.2)
+                    .animation(
+                        .easeInOut(duration: 1.2)
+                            .repeatForever()
+                            .delay(Double(i) * 0.2),
+                        value: animate
+                    )
+            }
+        }
+        .onAppear { animate = true }
+    }
+}
+
+// MARK: - Pulse Opacity (for status dot)
+
+private struct PulseOpacity: ViewModifier {
+    @State private var pulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(pulsing ? 1.0 : 0.4)
+            .animation(
+                .easeInOut(duration: 2.5).repeatForever(autoreverses: true),
+                value: pulsing
+            )
+            .onAppear { pulsing = true }
     }
 }

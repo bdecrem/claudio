@@ -6,40 +6,52 @@ struct AgentPicker: View {
 
     var body: some View {
         if agents.isEmpty {
-            // Show the raw agent name if set manually
             if !selected.isEmpty {
                 Text(selected)
-                    .font(Theme.caption.weight(.medium))
+                    .font(.system(.caption, design: .monospaced, weight: .medium))
                     .foregroundStyle(Theme.accent)
-                    .padding(.horizontal, Theme.spacing * 2)
+                    .padding(.horizontal, Theme.spacing * 1.5)
                     .padding(.vertical, Theme.spacing * 0.75)
-                    .background(Theme.surface, in: Capsule())
+                    .background(Theme.accentDim, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.accent, lineWidth: 1))
             }
         } else {
-            HStack(spacing: 0) {
-                ForEach(agents) { agent in
-                    Button {
-                        HapticsManager.selection()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            selected = agent.id
-                        }
-                    } label: {
-                        Text(agent.name)
-                            .font(Theme.caption.weight(.medium))
-                            .foregroundStyle(selected == agent.id ? Theme.background : Theme.textSecondary)
-                            .padding(.horizontal, Theme.spacing * 2)
-                            .padding(.vertical, Theme.spacing * 0.75)
-                            .background {
-                                if selected == agent.id {
-                                    Capsule()
-                                        .fill(Theme.accent)
-                                }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(agents) { agent in
+                        let isSelected = selected == agent.id
+
+                        Button {
+                            HapticsManager.selection()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                selected = agent.id
                             }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(isSelected ? Theme.accent : Theme.textSecondary)
+                                    .frame(width: 5, height: 5)
+                                    .opacity(0.7)
+
+                                Text(agent.name)
+                                    .font(.system(.caption2, design: .monospaced))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+                            .background(isSelected ? Theme.accentDim : Color.clear)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(
+                                        isSelected ? Theme.accent : Theme.border,
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
                     }
                 }
             }
-            .padding(3)
-            .background(Theme.surface, in: Capsule())
         }
     }
 }

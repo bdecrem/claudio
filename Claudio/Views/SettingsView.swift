@@ -13,70 +13,17 @@ struct SettingsView: View {
     @State private var showDangerousConfirm = false
     @State private var dangerousExpanded = false
 
+    private let cardRadius: CGFloat = 14
+
     var body: some View {
         NavigationStack {
-            List {
-                // MARK: - Servers
-                Section {
-                    ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
-                        let isActive = index == chatService.activeServerIndex
+            ScrollView {
+                VStack(spacing: 32) {
 
+                    // MARK: - Servers
+                    SettingsSection(title: "Servers") {
                         Button {
-                            if !isActive {
-                                chatService.switchServer(to: index)
-                            }
-                        } label: {
-                            HStack(spacing: Theme.spacing * 1.5) {
-                                Circle()
-                                    .fill(isActive ? Color.green : Theme.textSecondary.opacity(0.3))
-                                    .frame(width: 7, height: 7)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(displayName(for: server.url))
-                                        .font(Theme.body)
-                                        .foregroundStyle(isActive ? Theme.textPrimary : Theme.textSecondary)
-                                        .lineLimit(1)
-
-                                    Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
-                                        .font(Theme.caption)
-                                        .foregroundStyle(Theme.textSecondary.opacity(0.6))
-                                }
-
-                                Spacer()
-
-                                if isActive && isFetching {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                        .tint(Theme.accent)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .listRowBackground(isActive ? Theme.accent.opacity(0.08) : Theme.surface)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            if !isActive {
-                                Button(role: .destructive) {
-                                    chatService.removeServer(at: index)
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                            }
-                            Button {
-                                editingIndex = index
-                                editURL = server.url
-                                editToken = server.token
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Theme.accent)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Servers")
-                        Spacer()
-                        Button {
-                            editingIndex = -1  // -1 = adding new
+                            editingIndex = -1
                             editURL = ""
                             editToken = ""
                         } label: {
@@ -84,140 +31,306 @@ struct SettingsView: View {
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(Theme.textSecondary)
                         }
-                    }
-                } footer: {
-                    if chatService.savedServers.count > 1 {
-                        Text("Swipe to edit or remove.")
-                            .font(Theme.caption)
-                    }
-                }
+                    } content: {
+                        VStack(spacing: 0) {
+                            ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
+                                let isActive = index == chatService.activeServerIndex
 
-                // MARK: - Agents
-                if !chatService.agents.isEmpty {
-                    Section {
-                        ForEach(chatService.agents) { agent in
-                            Button {
-                                chatService.selectedAgent = agent.id
-                            } label: {
-                                HStack(spacing: Theme.spacing) {
-                                    if let emoji = agent.emoji {
-                                        Text(emoji)
+                                if index > 0 {
+                                    Divider()
+                                        .background(Theme.border)
+                                        .padding(.leading, 16)
+                                }
+
+                                Button {
+                                    if !isActive {
+                                        chatService.switchServer(to: index)
                                     }
-                                    Text(agent.name)
-                                        .font(Theme.body)
-                                        .foregroundStyle(Theme.textPrimary)
-                                    Spacer()
-                                    if chatService.selectedAgent == agent.id {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 14))
-                                            .foregroundStyle(Theme.accent)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Circle()
+                                            .fill(isActive ? Theme.green : Theme.textSecondary.opacity(0.3))
+                                            .frame(width: 8, height: 8)
+                                            .shadow(color: isActive ? Theme.green.opacity(0.5) : .clear, radius: 3)
+
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(displayName(for: server.url))
+                                                .font(.system(size: 15))
+                                                .foregroundStyle(isActive ? Theme.textPrimary : Theme.textSecondary)
+                                                .lineLimit(1)
+
+                                            Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
+                                                .font(.system(size: 12, design: .monospaced))
+                                                .foregroundStyle(Theme.textSecondary)
+                                        }
+
+                                        Spacer()
+
+                                        if isActive && isFetching {
+                                            ProgressView()
+                                                .scaleEffect(0.7)
+                                                .tint(Theme.accent)
+                                        }
+                                    }
+                                    .padding(14)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button {
+                                        editingIndex = index
+                                        editURL = server.url
+                                        editToken = server.token
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
+                                    }
+                                    if !isActive {
+                                        Button(role: .destructive) {
+                                            chatService.removeServer(at: index)
+                                        } label: {
+                                            Label("Remove", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
-                            .listRowBackground(Theme.surface)
                         }
-                    } header: {
-                        Text("Agents")
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
                     }
-                }
 
-                if chatService.agentFetchFailed {
-                    Section {
-                        VStack(alignment: .leading, spacing: Theme.spacing) {
-                            Text("Agent Name")
-                                .font(Theme.caption)
+                    // MARK: - Agents
+                    if !chatService.agents.isEmpty {
+                        SettingsSection(title: "Agents") {
+                            VStack(spacing: 0) {
+                                ForEach(Array(chatService.agents.enumerated()), id: \.element.id) { index, agent in
+                                    if index > 0 {
+                                        Divider()
+                                            .background(Theme.border)
+                                            .padding(.leading, 16)
+                                    }
+
+                                    Button {
+                                        chatService.selectedAgent = agent.id
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            if let emoji = agent.emoji {
+                                                Text(emoji)
+                                                    .font(.system(size: 20))
+                                            }
+                                            Text(agent.name)
+                                                .font(.system(size: 15))
+                                                .foregroundStyle(Theme.textPrimary)
+                                            Spacer()
+                                            if chatService.selectedAgent == agent.id {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 17))
+                                                    .foregroundStyle(Theme.accent)
+                                            }
+                                        }
+                                        .padding(14)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        }
+                    }
+
+                    if chatService.agentFetchFailed {
+                        SettingsSection(title: "Agent") {
+                            VStack(alignment: .leading, spacing: Theme.spacing) {
+                                Text("Agent Name")
+                                    .font(Theme.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                                TextField("e.g. mave", text: Binding(
+                                    get: { chatService.selectedAgent },
+                                    set: { chatService.selectedAgent = $0 }
+                                ))
+                                .font(Theme.body)
+                                .foregroundStyle(Theme.textPrimary)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                            }
+                            .padding(14)
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+
+                            Text(chatService.connectionError ?? "Couldn't reach server.")
+                                .font(.system(size: 12, design: .monospaced))
                                 .foregroundStyle(Theme.textSecondary)
-                            TextField("e.g. mave", text: Binding(
-                                get: { chatService.selectedAgent },
-                                set: { chatService.selectedAgent = $0 }
-                            ))
-                            .font(Theme.body)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                                .padding(.horizontal, 4)
+                                .padding(.top, 4)
                         }
-                        .listRowBackground(Theme.surface)
-                    } header: {
-                        Text("Agent")
-                    } footer: {
-                        Text(chatService.connectionError ?? "Couldn't reach server.")
-                            .font(Theme.caption)
                     }
-                }
 
-                // MARK: - Clear
-                if !chatService.messages.isEmpty {
-                    Section {
-                        Button("Clear Conversation") {
-                            chatService.clearMessages()
-                            dismiss()
+                    // MARK: - Clear
+                    if !chatService.messages.isEmpty {
+                        VStack(spacing: 0) {
+                            Button {
+                                chatService.clearMessages()
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text("Clear Conversation")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Theme.danger.opacity(0.7))
+                                    Spacer()
+                                }
+                                .padding(14)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .foregroundStyle(.red)
-                        .listRowBackground(Theme.surface)
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        .padding(.horizontal, 16)
                     }
-                }
 
-                // MARK: - Advanced
-                Section {
-                    DisclosureGroup(isExpanded: $dangerousExpanded) {
-                        VStack(alignment: .leading, spacing: Theme.spacing) {
-                            Toggle(isOn: dangerousSkipPermissions ? .constant(true) : $dangerousTogglePending) {
-                                Text("--dangerously-skip-permissions")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(dangerousSkipPermissions ? .red.opacity(0.5) : .red.opacity(0.7))
-                            }
-                            .tint(.red.opacity(0.5))
-                            .disabled(dangerousSkipPermissions)
-                            .onChange(of: dangerousTogglePending) { _, newValue in
-                                if newValue { showDangerousConfirm = true }
-                            }
+                    // MARK: - Advanced
+                    VStack(spacing: 10) {
+                        // Divider
+                        HStack(spacing: 10) {
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.clear, Theme.danger.opacity(0.08), .clear],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(height: 1)
+                            Text("ADVANCED")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(Theme.danger.opacity(0.4))
+                                .kerning(2)
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.clear, Theme.danger.opacity(0.08), .clear],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(height: 1)
+                        }
+                        .padding(.horizontal, 4)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(dangerousSkipPermissions
-                                     ? "permissions skipped."
-                                     : "skips all permission prompts.")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(Theme.textSecondary.opacity(0.35))
-                                Text(dangerousSkipPermissions
-                                     ? "reinstall to undo."
-                                     : "claudio will not ask. claudio will act.")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundStyle(Theme.textSecondary.opacity(0.35))
+                        // Card
+                        VStack(spacing: 0) {
+                            // Header row
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    dangerousExpanded.toggle()
+                                }
+                            } label: {
+                                HStack {
+                                    Text("For advanced users only")
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(Theme.textDim.opacity(0.8))
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(dangerousExpanded ? Theme.danger.opacity(0.5) : Theme.textDim)
+                                        .rotationEffect(.degrees(dangerousExpanded ? 0 : -90))
+                                }
+                                .padding(14)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            // Expanded content
+                            if dangerousExpanded {
+                                Divider()
+                                    .background(Color.white.opacity(0.04))
+
+                                VStack(alignment: .leading, spacing: Theme.spacing) {
+                                    HStack(alignment: .top) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("--dangerously-skip-permissions")
+                                                .font(.system(size: 13, design: .monospaced))
+                                                .foregroundStyle(dangerousSkipPermissions ? Theme.danger.opacity(0.5) : Theme.danger.opacity(0.85))
+
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                if dangerousSkipPermissions {
+                                                    Text("⚠ active — no guardrails. no confirmations.")
+                                                        .font(.system(size: 10, design: .monospaced))
+                                                        .foregroundStyle(Theme.danger.opacity(0.45))
+                                                    Text("you have been warned.")
+                                                        .font(.system(size: 10, design: .monospaced))
+                                                        .foregroundStyle(Theme.danger.opacity(0.45))
+                                                } else {
+                                                    Text("skips all permission prompts.")
+                                                        .font(.system(size: 11, design: .monospaced))
+                                                        .foregroundStyle(Theme.textDim)
+                                                    Text("claudio will not ask. claudio will act.")
+                                                        .font(.system(size: 11, design: .monospaced))
+                                                        .foregroundStyle(Theme.textDim)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        Toggle("", isOn: dangerousSkipPermissions ? .constant(true) : $dangerousTogglePending)
+                                            .labelsHidden()
+                                            .tint(Theme.danger)
+                                            .disabled(dangerousSkipPermissions)
+                                            .onChange(of: dangerousTogglePending) { _, newValue in
+                                                if newValue { showDangerousConfirm = true }
+                                            }
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                         }
-                        .padding(.top, 4)
-                    } label: {
-                        Text("For advanced users only")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(Theme.textSecondary.opacity(0.3))
+                        .background(
+                            dangerousSkipPermissions
+                                ? LinearGradient(
+                                    colors: [Theme.surface, Theme.danger.opacity(0.04)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                : LinearGradient(
+                                    colors: [Theme.surface, Theme.surface],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                                .strokeBorder(
+                                    dangerousSkipPermissions ? Theme.danger.opacity(0.3) : .clear,
+                                    lineWidth: 1
+                                )
+                        )
                     }
-                    .tint(.red.opacity(0.4))
-                    .listRowBackground(Theme.surface)
-                } header: {
-                    HStack(spacing: Theme.spacing) {
-                        Rectangle()
-                            .fill(Theme.textSecondary.opacity(0.1))
-                            .frame(height: 0.5)
-                        Text("ADVANCED")
-                            .font(.system(.caption2, design: .rounded, weight: .medium))
-                            .foregroundStyle(.red.opacity(0.5))
-                            .kerning(3)
-                        Rectangle()
-                            .fill(Theme.textSecondary.opacity(0.1))
-                            .frame(height: 0.5)
-                    }
+                    .padding(.horizontal, 16)
                 }
+                .padding(.top, 8)
+                .padding(.bottom, 40)
             }
-            .scrollContentBackground(.hidden)
             .background(Theme.background)
-            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Settings")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
             }
-            .foregroundStyle(Theme.textPrimary)
             .sheet(item: $editingIndex) { index in
                 ServerEditSheet(
                     isNew: index == -1,
@@ -273,7 +386,47 @@ struct SettingsView: View {
     }
 }
 
-// Make Int work with .sheet(item:)
+// MARK: - Settings Section
+
+private struct SettingsSection<Trailing: View, Content: View>: View {
+    let title: String
+    var trailing: Trailing? = nil
+    @ViewBuilder let content: Content
+
+    init(title: String, @ViewBuilder trailing: () -> Trailing, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.trailing = trailing()
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .textCase(.uppercase)
+                    .kerning(0.5)
+                Spacer()
+                if let trailing { trailing }
+            }
+            .padding(.horizontal, 4)
+
+            content
+        }
+        .padding(.horizontal, 16)
+    }
+}
+
+extension SettingsSection where Trailing == EmptyView {
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.trailing = nil
+        self.content = content()
+    }
+}
+
+// MARK: - Make Int work with .sheet(item:)
 extension Int: @retroactive Identifiable {
     public var id: Int { self }
 }
@@ -290,20 +443,20 @@ private struct ServerEditSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: Theme.spacing) {
                         Text("Server URL")
-                            .font(Theme.caption)
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.textSecondary)
                         ZStack(alignment: .leading) {
                             if url.isEmpty {
                                 Text("your-server.example.com")
-                                    .font(Theme.body)
+                                    .font(.system(size: 15))
                                     .foregroundStyle(Theme.textSecondary.opacity(0.4))
                             }
                             TextField("", text: $url)
-                                .font(Theme.body)
+                                .font(.system(size: 15))
                                 .foregroundStyle(Theme.textPrimary)
                                 .tint(Theme.accent)
                                 .keyboardType(.URL)
@@ -311,26 +464,35 @@ private struct ServerEditSheet: View {
                                 .textInputAutocapitalization(.never)
                         }
                     }
-                    .listRowBackground(Theme.surface)
+                    .padding(14)
+
+                    Divider().background(Theme.border)
 
                     VStack(alignment: .leading, spacing: Theme.spacing) {
                         Text("Token")
-                            .font(Theme.caption)
+                            .font(.system(size: 12))
                             .foregroundStyle(Theme.textSecondary)
                         SecureField("Bearer token", text: $token)
-                            .font(Theme.body)
+                            .font(.system(size: 15))
                             .foregroundStyle(Theme.textPrimary)
                             .tint(Theme.accent)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
                     }
-                    .listRowBackground(Theme.surface)
-                } footer: {
-                    Text("Your server token authenticates all requests.")
-                        .font(Theme.caption)
+                    .padding(14)
                 }
+                .background(Theme.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+
+                Text("Your server token authenticates all requests.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
             }
-            .scrollContentBackground(.hidden)
             .background(Theme.background)
             .navigationTitle(isNew ? "Add Server" : "Edit Server")
             .navigationBarTitleDisplayMode(.inline)
