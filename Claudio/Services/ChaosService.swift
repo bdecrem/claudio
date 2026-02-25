@@ -8,7 +8,7 @@ final class ChaosService {
     static let shared = ChaosService()
 
     private let chaosURL = URL(string: "https://claudio.la/chaos.json")!
-    private let hmacKeyHex = "4aca3e3e4591f22f43b037387d9e7bffdcb79de5212e9fe0c58a25bdc0241af5"
+    private let publicKeyHex = "9854d27f58ab0d99af7b535a9268b498889d9128b8036026b2ed7a0852414905"
 
     private let defaults = UserDefaults.standard
     private let triggeredDateKey = "chaosTriggeredDate"
@@ -59,9 +59,9 @@ final class ChaosService {
                 return nil
             }
 
-            // Verify HMAC
+            // Verify signature
             guard verify(instruction: payload.instruction, date: payload.date, signature: payload.signature) else {
-                log.error("Chaos: HMAC verification failed")
+                log.error("Chaos: Ed25519 verification failed")
                 return nil
             }
 
@@ -78,18 +78,21 @@ final class ChaosService {
         log.info("Chaos: marked triggered for \(self.todayString)")
     }
 
-    // MARK: - HMAC Verification
+    // MARK: - Ed25519 Verification
 
     private func verify(instruction: String, date: String, signature: String) -> Bool {
-        guard let keyData = Data(hexString: hmacKeyHex) else { return false }
+        guard let keyData = Data(hexString: publicKeyHex),
+              let sigData = Data(hexString: signature) else { return false }
         let message = "\(instruction)|\(date)"
         guard let messageData = message.data(using: .utf8) else { return false }
 
-        let key = SymmetricKey(data: keyData)
-        let mac = HMAC<SHA256>.authenticationCode(for: messageData, using: key)
-        let computed = mac.map { String(format: "%02x", $0) }.joined()
-
-        return computed == signature
+        do {
+            let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: keyData)
+            return publicKey.isValidSignature(sigData, for: messageData)
+        } catch {
+            log.error("Chaos: invalid public key — \(error)")
+            return false
+        }
     }
 
     // MARK: - Helpers
