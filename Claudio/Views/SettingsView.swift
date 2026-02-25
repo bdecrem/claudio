@@ -315,21 +315,34 @@ struct SettingsView: View {
                 .padding(.bottom, 40)
             }
             .background(Theme.background)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
+            .navigationBarHidden(true)
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    // Balance spacer for centering
+                    Color.clear.frame(width: 56, height: 1)
+
+                    Spacer()
+
                     Text("Settings")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
+
+                    Spacer()
+
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 8)
+                            .background(Theme.surface, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 7)
-                        .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
+                .background(Theme.background)
             }
             .sheet(item: $editingIndex) { index in
                 ServerEditSheet(

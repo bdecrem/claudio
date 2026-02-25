@@ -3,8 +3,8 @@ import SwiftUI
 enum Theme {
     // MARK: - Colors
     static let background = Color(hex: "0A0A0A")
-    static let surface = Color(hex: "161616")
-    static let surface2 = Color(hex: "1E1E1E")
+    static let surface = Color(hex: "1A1A1A")
+    static let surface2 = Color(hex: "222222")
     static let border = Color(hex: "2A2A2A")
     static let accent = Color(hex: "D4A44C")
     static let accentDim = Color(hex: "D4A44C").opacity(0.12)
