@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var dangerousSkipPermissions = UserDefaults.standard.bool(forKey: "dangerouslySkipPermissions")
     @State private var dangerousTogglePending = false
     @State private var showDangerousConfirm = false
+    @State private var dangerousExpanded = false
 
     var body: some View {
         NavigationStack {
@@ -155,42 +156,55 @@ struct SettingsView: View {
                     }
                 }
 
-                // MARK: - Danger Zone
+                // MARK: - Advanced
                 Section {
-                    if dangerousSkipPermissions {
-                        HStack {
-                            Text("--dangerously-skip-permissions")
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(.red)
-                            Spacer()
-                            Text("ENABLED")
-                                .font(.system(.caption, design: .monospaced, weight: .bold))
-                                .foregroundStyle(.red)
-                        }
-                        .listRowBackground(Theme.surface)
-                    } else {
-                        Toggle(isOn: $dangerousTogglePending) {
-                            Text("--dangerously-skip-permissions")
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(.red)
-                        }
-                        .tint(.red)
-                        .listRowBackground(Theme.surface)
-                        .onChange(of: dangerousTogglePending) { _, newValue in
-                            if newValue {
-                                showDangerousConfirm = true
+                    DisclosureGroup(isExpanded: $dangerousExpanded) {
+                        VStack(alignment: .leading, spacing: Theme.spacing) {
+                            Toggle(isOn: dangerousSkipPermissions ? .constant(true) : $dangerousTogglePending) {
+                                Text("--dangerously-skip-permissions")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(dangerousSkipPermissions ? .red.opacity(0.5) : .red.opacity(0.7))
+                            }
+                            .tint(.red.opacity(0.5))
+                            .disabled(dangerousSkipPermissions)
+                            .onChange(of: dangerousTogglePending) { _, newValue in
+                                if newValue { showDangerousConfirm = true }
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(dangerousSkipPermissions
+                                     ? "permissions skipped."
+                                     : "skips all permission prompts.")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(Theme.textSecondary.opacity(0.35))
+                                Text(dangerousSkipPermissions
+                                     ? "reinstall to undo."
+                                     : "claudio will not ask. claudio will act.")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(Theme.textSecondary.opacity(0.35))
                             }
                         }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("For advanced users only")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(Theme.textSecondary.opacity(0.3))
                     }
+                    .tint(.red.opacity(0.4))
+                    .listRowBackground(Theme.surface)
                 } header: {
-                    Text("Danger Zone")
-                        .foregroundStyle(.red)
-                } footer: {
-                    Text(dangerousSkipPermissions
-                         ? "Reinstall the app to disable this."
-                         : "Skips all permission prompts. You probably shouldn't enable this.")
-                        .font(Theme.caption)
-                        .foregroundStyle(.red.opacity(0.6))
+                    HStack(spacing: Theme.spacing) {
+                        Rectangle()
+                            .fill(Theme.textSecondary.opacity(0.1))
+                            .frame(height: 0.5)
+                        Text("ADVANCED")
+                            .font(.system(.caption2, design: .rounded, weight: .medium))
+                            .foregroundStyle(.red.opacity(0.5))
+                            .kerning(3)
+                        Rectangle()
+                            .fill(Theme.textSecondary.opacity(0.1))
+                            .frame(height: 0.5)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -282,13 +296,20 @@ private struct ServerEditSheet: View {
                         Text("Server URL")
                             .font(Theme.caption)
                             .foregroundStyle(Theme.textSecondary)
-                        TextField("https://your-server.ngrok.io", text: $url)
-                            .font(Theme.body)
-                            .foregroundStyle(Theme.textPrimary)
-                            .tint(Theme.accent)
-                            .textContentType(.URL)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                        ZStack(alignment: .leading) {
+                            if url.isEmpty {
+                                Text("your-server.example.com")
+                                    .font(Theme.body)
+                                    .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                            }
+                            TextField("", text: $url)
+                                .font(Theme.body)
+                                .foregroundStyle(Theme.textPrimary)
+                                .tint(Theme.accent)
+                                .keyboardType(.URL)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                        }
                     }
                     .listRowBackground(Theme.surface)
 
