@@ -1,281 +1,557 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claudio — Voice & Text</title>
-  <link rel="icon" type="image/svg+xml" href="../icon.svg">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudio — Voice & Text for OpenClaw</title>
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Geist+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --bg: #0A0806;
-      --surface: #161210;
-      --amber: #D4A574;
-      --amber-dim: #9A6840;
-      --text: #F5F0EB;
-      --text-muted: #6B5D52;
-      --warm-black: #110604;
-    }
+  :root {
+    --bg:       #0f0c0a;
+    --bg-card:  #161210;
+    --terra:    #c4664a;
+    --terra-lt: #d4866a;
+    --gold:     #c4a45a;
+    --muted:    #6b5c52;
+    --text:     #d4c4bc;
+    --text-dim: #7a6a62;
+    --border:   rgba(196,102,74,0.14);
+  }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Fraunces', Georgia, serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Space Grotesk', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow-x: hidden;
-    }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
 
-    /* Warm radial glow behind the character */
-    .glow {
-      position: fixed;
-      top: 28vh;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(192,90,60,0.08) 0%, transparent 70%);
-      pointer-events: none;
-      z-index: 0;
-    }
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
 
-    /* Subtle grain overlay */
-    .grain {
-      position: fixed;
-      inset: 0;
-      opacity: 0.03;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 1;
-    }
+  /* ── Header ── */
+  header {
+    padding: 64px 0 48px;
+    text-align: center;
+  }
 
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 1.5rem;
-      position: relative;
-      z-index: 2;
-    }
+  .mascot {
+    display: block;
+    margin: 0 auto 32px;
+    width: 82px;
+    height: 82px;
+    animation: idle 4s ease-in-out infinite;
+  }
 
-    .character {
-      width: 148px;
-      height: 148px;
-      margin-bottom: 2.5rem;
-      animation: float 6s ease-in-out infinite;
-      filter: drop-shadow(0 20px 40px rgba(154,56,32,0.15));
-    }
+  @keyframes idle {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+  }
 
-    .character svg {
-      width: 100%;
-      height: 100%;
-    }
+  h1 {
+    font-size: clamp(2.8rem, 8vw, 4.2rem);
+    font-weight: 300;
+    font-style: italic;
+    color: var(--terra-lt);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
-    }
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
 
-    h1 {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 400;
-      font-size: clamp(2.8rem, 6vw, 4.2rem);
-      letter-spacing: -0.02em;
-      margin-bottom: 0.6rem;
-      background: linear-gradient(135deg, #EAB090, #C86040, #9A3820);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: fadeUp 1s ease-out 0.2s both;
-    }
+  /* ── Hero copy ── */
+  .hero-copy {
+    text-align: center;
+    margin-bottom: 48px;
+  }
 
-    .subtitle {
-      font-size: 0.7rem;
-      font-weight: 300;
-      letter-spacing: 0.35em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 3rem;
-      animation: fadeUp 1s ease-out 0.4s both;
-    }
+  .hero-copy p.lead {
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 14px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 
-    .tagline {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: clamp(1rem, 2.5vw, 1.25rem);
-      font-weight: 300;
-      color: var(--text-muted);
-      max-width: 560px;
-      text-align: center;
-      line-height: 1.7;
-      margin-bottom: 3rem;
-      animation: fadeUp 1s ease-out 0.6s both;
-    }
+  .hero-copy p.sub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
 
-    .cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.9rem 2rem;
-      background: linear-gradient(135deg, rgba(212,165,116,0.12), rgba(154,56,32,0.12));
-      border: 1px solid rgba(212,165,116,0.2);
-      border-radius: 100px;
-      color: var(--amber);
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 0.9rem;
-      font-weight: 500;
-      letter-spacing: 0.03em;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      animation: fadeUp 1s ease-out 0.8s both;
-    }
+  /* ── Gallery ── */
+  .gallery {
+    margin-bottom: 52px;
+  }
 
-    .cta:hover {
-      background: linear-gradient(135deg, rgba(212,165,116,0.2), rgba(154,56,32,0.2));
-      border-color: rgba(212,165,116,0.4);
-      transform: translateY(-1px);
-      box-shadow: 0 8px 32px rgba(154,56,32,0.15);
-    }
+  .gallery-track-wrap {
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    max-width: 280px;
+    margin: 0 auto;
+    aspect-ratio: 9/16;
+    position: relative;
+  }
 
-    .cta svg {
-      width: 18px;
-      height: 18px;
-      fill: currentColor;
-    }
+  .gallery-track {
+    display: flex;
+    width: 200%;
+    height: 100%;
+    transition: transform 0.42s cubic-bezier(0.4,0,0.2,1);
+  }
 
-    .discord-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-top: 1rem;
-      color: var(--text-muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 0.85rem;
-      text-decoration: none;
-      transition: color 0.2s;
-      animation: fadeUp 1s ease-out 1s both;
-    }
+  .gallery-slide {
+    width: 50%;
+    height: 100%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 12px 12px;
+    gap: 8px;
+  }
 
-    .discord-link:hover {
-      color: var(--amber);
-    }
+  .notch {
+    width: 38px;
+    height: 5px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 3px;
+    margin: 0 auto 4px;
+    flex-shrink: 0;
+  }
 
-    .discord-link svg {
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-    }
+  /* Text chat slide */
+  .ui-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-bottom: 4px;
+  }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+  .bubble {
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.6rem;
+    line-height: 1.45;
+    max-width: 85%;
+  }
 
-    /* Footer */
-    footer {
-      position: relative;
-      z-index: 2;
-      padding: 2rem 1.5rem;
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      border-top: 1px solid rgba(107,93,82,0.1);
-    }
+  .bubble.agent {
+    background: rgba(196,102,74,0.1);
+    border: 1px solid rgba(196,102,74,0.2);
+    color: var(--terra-lt);
+    align-self: flex-start;
+    border-radius: 3px 10px 10px 10px;
+  }
 
-    footer a {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      letter-spacing: 0.04em;
-      transition: color 0.2s;
-    }
+  .bubble.user {
+    background: rgba(100,80,70,0.22);
+    border: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    align-self: flex-end;
+    border-radius: 10px 3px 10px 10px;
+  }
 
-    footer a:hover {
-      color: var(--amber-dim);
-    }
-  </style>
+  /* Voice slide */
+  .ui-voice {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+  }
+
+  .voice-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(196,102,74,0.1);
+    border: 1.5px solid rgba(196,102,74,0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .voice-ring::before {
+    content: '';
+    position: absolute;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border: 1px solid rgba(196,102,74,0.1);
+    animation: pulse-ring 2.5s ease-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.88); opacity: 0.5; }
+    100% { transform: scale(1.3);  opacity: 0; }
+  }
+
+  .waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 24px;
+  }
+
+  .waveform span {
+    display: block;
+    width: 2.5px;
+    background: var(--terra);
+    border-radius: 2px;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+
+  .waveform span:nth-child(1) { height: 6px;  animation-delay: 0s;    }
+  .waveform span:nth-child(2) { height: 14px; animation-delay: 0.1s;  }
+  .waveform span:nth-child(3) { height: 22px; animation-delay: 0.2s;  }
+  .waveform span:nth-child(4) { height: 10px; animation-delay: 0.3s;  }
+  .waveform span:nth-child(5) { height: 18px; animation-delay: 0.15s; }
+  .waveform span:nth-child(6) { height: 8px;  animation-delay: 0.25s; }
+  .waveform span:nth-child(7) { height: 14px; animation-delay: 0.05s; }
+
+  @keyframes wave {
+    0%,100% { transform: scaleY(1); }
+    50%      { transform: scaleY(0.35); }
+  }
+
+  .slide-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* Dots */
+  .gallery-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.35;
+    cursor: pointer;
+    transition: opacity 0.2s, background 0.2s, transform 0.2s;
+    border: none;
+    padding: 0;
+    appearance: none;
+  }
+
+  .dot.active {
+    background: var(--terra);
+    opacity: 1;
+    transform: scale(1.2);
+  }
+
+  /* ── Spec bullets ── */
+  .specs {
+    border-top: 1px solid var(--border);
+    padding: 32px 0 40px;
+    margin-bottom: 40px;
+  }
+
+  .spec-bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .spec-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: 300;
+  }
+
+  .spec-item::before {
+    content: '·';
+    color: var(--terra);
+    font-size: 1.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .spec-item a {
+    color: var(--terra-lt);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(196,102,74,0.28);
+    transition: border-color 0.2s;
+  }
+
+  .spec-item a:hover { border-color: var(--terra-lt); }
+
+  .spec-item .dim {
+    color: var(--text-dim);
+  }
+
+  /* ── CTA ── */
+  .cta-block {
+    text-align: center;
+    padding: 0 0 52px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-family: 'Fraunces', serif;
+    font-size: 0.93rem;
+    font-weight: 400;
+    text-decoration: none;
+    transition: all 0.2s;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-primary {
+    background: var(--terra);
+    color: #1a0f0a;
+    border: 1.5px solid var(--terra);
+  }
+
+  .btn-primary:hover {
+    background: var(--terra-lt);
+    border-color: var(--terra-lt);
+    transform: translateY(-1px);
+  }
+
+  .cta-note {
+    margin-top: 14px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .cta-note a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(107,92,82,0.35);
+  }
+
+  .cta-note a:hover { color: var(--text-dim); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+  footer a:hover { color: var(--muted); }
+  footer .links { display: flex; gap: 18px; }
+
+  /* ── Reveals ── */
+  .reveal { opacity: 0; transform: translateY(16px); animation: reveal 0.65s ease forwards; }
+  .r1 { animation-delay: 0.05s; }
+  .r2 { animation-delay: 0.15s; }
+  .r3 { animation-delay: 0.25s; }
+  .r4 { animation-delay: 0.35s; }
+  .r5 { animation-delay: 0.45s; }
+  .r6 { animation-delay: 0.55s; }
+
+  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 480px) {
+    footer { flex-direction: column; gap: 10px; }
+  }
+</style>
 </head>
 <body>
-  <div class="glow"></div>
-  <div class="grain"></div>
+<div class="wrap">
 
-  <main>
-    <div class="character">
-      <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="ib" cx="35%" cy="28%" r="68%">
-            <stop offset="0%" stop-color="#EAB090"/>
-            <stop offset="35%" stop-color="#C86040"/>
-            <stop offset="70%" stop-color="#9A3820"/>
-            <stop offset="100%" stop-color="#621808"/>
-          </radialGradient>
-          <radialGradient id="ie" cx="45%" cy="35%" r="60%">
-            <stop offset="0%" stop-color="#2A1008"/>
-            <stop offset="100%" stop-color="#120604"/>
-          </radialGradient>
-          <radialGradient id="ispec" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="white" stop-opacity="0.2"/>
-            <stop offset="100%" stop-color="white" stop-opacity="0"/>
-          </radialGradient>
-          <linearGradient id="ileg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#9A3820"/>
-            <stop offset="100%" stop-color="#621808"/>
-          </linearGradient>
-        </defs>
-        <!-- Antennae -->
-        <path d="M 51 30 C 50 22 45 14 47 8" stroke="#C05A3C" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <circle cx="47" cy="7" r="2.8" fill="#D4856A"/>
-        <path d="M 69 30 C 70 22 75 14 73 8" stroke="#C05A3C" stroke-width="2" stroke-linecap="round" fill="none"/>
-        <circle cx="73" cy="7" r="2.8" fill="#D4856A"/>
-        <!-- Arms -->
-        <ellipse cx="20" cy="62" rx="12" ry="10" fill="#9A3820"/>
-        <ellipse cx="100" cy="62" rx="12" ry="10" fill="#9A3820"/>
-        <!-- Legs -->
-        <rect x="43" y="88" width="12" height="20" rx="5" fill="url(#ileg)"/>
-        <rect x="65" y="88" width="12" height="20" rx="5" fill="url(#ileg)"/>
-        <!-- Body -->
-        <circle cx="60" cy="58" r="42" fill="url(#ib)"/>
-        <!-- Specular -->
-        <ellipse cx="44" cy="38" rx="18" ry="12" fill="url(#ispec)" transform="rotate(-20 44 38)"/>
-        <!-- Eyes -->
-        <circle cx="48" cy="57" r="12" fill="url(#ie)"/>
-        <circle cx="72" cy="57" r="12" fill="url(#ie)"/>
-        <circle cx="51.5" cy="53" r="4" fill="#FFD060" opacity="0.95"/>
-        <circle cx="75.5" cy="53" r="4" fill="#FFD060" opacity="0.95"/>
-        <!-- Mic badge -->
-        <circle cx="91" cy="85" r="12" fill="#0E0604" opacity="0.85"/>
-        <rect x="88.5" y="77" width="5" height="8.5" rx="2.5" fill="white"/>
-        <path d="M 86 83 Q 86 89.5 91 89.5 Q 96 89.5 96 83" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-        <line x1="91" y1="89.5" x2="91" y2="92" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
+  <header>
+    <svg class="mascot reveal r1" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="37" y1="14" x2="32" y2="4" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="32" cy="3" r="2.2" fill="#c4664a"/>
+      <line x1="51" y1="14" x2="56" y2="4" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="56" cy="3" r="2.2" fill="#c4664a"/>
+      <circle cx="44" cy="32" r="20" fill="#b85c42"/>
+      <radialGradient id="hg" cx="38%" cy="30%" r="60%">
+        <stop offset="0%" stop-color="#d4806a" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="#8a3e2c" stop-opacity="0"/>
+      </radialGradient>
+      <circle cx="44" cy="32" r="20" fill="url(#hg)"/>
+      <circle cx="37" cy="31" r="6.5" fill="#1a0f0a"/>
+      <circle cx="51" cy="31" r="6.5" fill="#1a0f0a"/>
+      <circle cx="39" cy="29.5" r="1.8" fill="#c4943a" opacity="0.9"/>
+      <circle cx="53" cy="29.5" r="1.8" fill="#c4943a" opacity="0.9"/>
+      <circle cx="64.5" cy="32" r="2.5" fill="#c4a45a"/>
+      <rect x="32" y="50" width="24" height="22" rx="6" fill="#b05438"/>
+      <radialGradient id="bg2" cx="40%" cy="25%" r="70%">
+        <stop offset="0%" stop-color="#d0704e" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#8a3e2c" stop-opacity="0"/>
+      </radialGradient>
+      <rect x="32" y="50" width="24" height="22" rx="6" fill="url(#bg2)"/>
+      <rect x="20" y="52" width="10" height="8" rx="4" fill="#b05438"/>
+      <rect x="58" y="52" width="10" height="8" rx="4" fill="#b05438"/>
+      <rect x="35" y="70" width="7" height="10" rx="3.5" fill="#9a4830"/>
+      <rect x="46" y="70" width="7" height="10" rx="3.5" fill="#9a4830"/>
+    </svg>
+
+    <h1 class="reveal r2">Claudio</h1>
+    <p class="eyebrow reveal r2">Voice &amp; Text · OpenClaw Client</p>
+  </header>
+
+  <div class="hero-copy">
+    <p class="lead reveal r3">
+      A minimal iPhone client for talking to your OpenClaw agents —
+      by voice or by text. Full conversation context maintained.
+    </p>
+    <p class="sub reveal r3">v0.1 · made with care · no accounts · no data collection</p>
+  </div>
+
+  <!-- Gallery -->
+  <div class="gallery reveal r4">
+    <div class="gallery-track-wrap">
+      <div class="gallery-track" id="gallery-track">
+
+        <!-- Slide 1: Text chat -->
+        <div class="gallery-slide">
+          <div class="notch"></div>
+          <div class="ui-chat">
+            <div class="bubble agent">Sure — I can run that query against the DB right now.</div>
+            <div class="bubble user">check yesterday's errors</div>
+            <div class="bubble agent">Found 3 anomalies in the auth service. Want me to open a ticket?</div>
+            <div class="bubble user">yeah go ahead</div>
+            <div class="bubble agent">Done. Ticket #204 created and assigned.</div>
+          </div>
+          <div class="slide-label">Text chat</div>
+        </div>
+
+        <!-- Slide 2: Voice mode -->
+        <div class="gallery-slide">
+          <div class="notch"></div>
+          <div class="ui-voice">
+            <div class="voice-ring">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" fill="#c4664a" opacity="0.9"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="12" y1="19" x2="12" y2="22" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="waveform">
+              <span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="slide-label">Voice mode</div>
+        </div>
+
+      </div>
     </div>
 
-    <h1>Claudio</h1>
-    <p class="subtitle">Voice & Text</p>
+    <div class="gallery-dots">
+      <button class="dot active" data-index="0" aria-label="Text chat"></button>
+      <button class="dot"        data-index="1" aria-label="Voice mode"></button>
+    </div>
+  </div>
 
-    <p class="tagline">Voice & text chat with your OpenClaw agents. Hume.ai for voice. Full conversation context maintained.</p>
+  <!-- Spec bullets -->
+  <div class="specs reveal r5">
+    <div class="spec-bullets">
+      <div class="spec-item">Apple Speech for STT, server-side TTS <span class="dim">— voice is enhancement, not requirement</span></div>
+      <div class="spec-item">Self-hosted <a href="https://github.com/kochitolabs/openclaw" target="_blank">OpenClaw</a> backend via OpenAI-compatible API</div>
+      <div class="spec-item">No credentials stored on device <span class="dim">— server URL only</span></div>
+      <div class="spec-item">iOS 17+ <span class="dim">— requires your own OpenClaw instance</span></div>
+      <div class="spec-item">No data collected. No account. Conversations stay on your server.</div>
+    </div>
+  </div>
 
-    <p class="tagline" style="opacity: 0.5; font-size: 0.85rem; margin-top: -2rem;">v0.1. It's early. But "simple and made with care" is the entire roadmap. Token in, chat out. No accounts, no data collection, no nonsense. Message us on Discord for help setting up Hume.ai voice. ElevenLabs support is next.</p>
+  <!-- CTA -->
+  <div class="cta-block reveal r6">
+    <a class="btn btn-primary" href="mailto:hello@kochi.to">TestFlight Invite</a>
+    <p class="cta-note">Need help setting up? <a href="https://discord.gg/c3avyCvjz5">Join our Discord</a></p>
+  </div>
 
-    <a href="mailto:hello@kochi.to" class="cta">
-      TestFlight Invite
-    </a>
-    <a href="https://discord.gg/c3avyCvjz5" class="discord-link">
-      <svg viewBox="0 0 16 16"><path d="M13.545 2.907a13.2 13.2 0 0 0-3.257-1.011.05.05 0 0 0-.052.025c-.141.25-.297.577-.406.833a12.2 12.2 0 0 0-3.658 0 8 8 0 0 0-.412-.833.05.05 0 0 0-.052-.025c-1.125.194-2.22.534-3.257 1.011a.04.04 0 0 0-.021.018C.356 6.024-.213 9.047.066 12.032q.003.022.021.037a13.3 13.3 0 0 0 3.995 2.02.05.05 0 0 0 .056-.019q.463-.63.818-1.329a.05.05 0 0 0-.01-.059l-.018-.011a9 9 0 0 1-1.248-.595.05.05 0 0 1-.02-.066l.015-.019q.127-.095.248-.195a.05.05 0 0 1 .051-.007c2.619 1.196 5.454 1.196 8.041 0a.05.05 0 0 1 .053.007q.121.1.248.195a.05.05 0 0 1-.004.085 8 8 0 0 1-1.249.594.05.05 0 0 0-.03.03.05.05 0 0 0 .003.041c.24.465.515.909.817 1.329a.05.05 0 0 0 .056.019 13.2 13.2 0 0 0 4.001-2.02.05.05 0 0 0 .021-.037c.334-3.451-.559-6.449-2.366-9.106a.03.03 0 0 0-.02-.019m-8.198 7.307c-.789 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.45.73 1.438 1.613 0 .888-.637 1.612-1.438 1.612m5.316 0c-.788 0-1.438-.724-1.438-1.612s.637-1.613 1.438-1.613c.807 0 1.451.73 1.438 1.613 0 .888-.631 1.612-1.438 1.612"/></svg>
-      Join our Discord
-    </a>
-
-  </main>
-
-  <footer>
-    <a href="privacy.html">Privacy Policy</a>
-    <a href="terms.html">Terms of Service</a>
-    <a href="https://kochitolabs.com">&copy; 2026 Kochito Labs</a>
+  <footer class="reveal r6">
+    <span>&copy; 2026 Kochito Labs</span>
+    <div class="links">
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+    </div>
   </footer>
+
+</div>
+
+<script>
+  const track = document.getElementById('gallery-track');
+  const dots  = document.querySelectorAll('.dot');
+  let current = 0;
+
+  function goTo(i) {
+    current = i;
+    track.style.transform = `translateX(-${i * 50}%)`;
+    dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
+  }
+
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => goTo(+dot.dataset.index));
+  });
+
+  // Swipe support
+  let startX = 0;
+  const wrap = document.querySelector('.gallery-track-wrap');
+
+  wrap.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  wrap.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) goTo(dx < 0 ? 1 : 0);
+  });
+</script>
 </body>
 </html>
