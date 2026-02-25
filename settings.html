@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Claudio Settings</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=SF+Pro+Display:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-muted: #666;
+    --text-dim: #444;
+    --accent: #d4a44c;
+    --danger: #c0392b;
+    --danger-dim: rgba(192, 57, 43, 0.08);
+    --danger-glow: rgba(192, 57, 43, 0.15);
+    --green: #3dbd6c;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px 0 60px;
+  }
+
+  .phone {
+    width: 390px;
+    position: relative;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px 8px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .done-btn {
+    background: var(--surface2);
+    color: var(--accent);
+    border: none;
+    border-radius: 20px;
+    padding: 7px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Sections */
+  .section {
+    padding: 0 16px;
+    margin-bottom: 32px;
+  }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 4px;
+    margin-bottom: 8px;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .card-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    gap: 12px;
+    position: relative;
+  }
+
+  .card-row + .card-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .card-row .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(61, 189, 108, 0.5);
+  }
+
+  .card-row .row-main {
+    flex: 1;
+  }
+
+  .card-row .row-title {
+    font-size: 15px;
+    color: var(--text);
+    font-weight: 400;
+  }
+
+  .card-row .row-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 1px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .check {
+    color: var(--accent);
+    font-size: 17px;
+  }
+
+  .plus-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    font-weight: 300;
+  }
+
+  /* Toggle */
+  .toggle {
+    position: relative;
+    width: 51px;
+    height: 31px;
+    flex-shrink: 0;
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    border-radius: 100px;
+    background: var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    transition: transform 0.2s;
+  }
+
+  .toggle input:checked + .toggle-track {
+    background: var(--green);
+  }
+
+  .toggle input:checked + .toggle-track::after {
+    transform: translateX(20px);
+  }
+
+  /* ============================================
+     THE DANGEROUS SECTION
+     ============================================ */
+
+  .section.dangerous {
+    position: relative;
+  }
+
+  .danger-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 4px;
+    margin-bottom: 10px;
+  }
+
+  .danger-divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--danger-dim), transparent);
+  }
+
+  .danger-divider-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--danger);
+    opacity: 0.4;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .danger-card {
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: border-color 0.4s;
+    position: relative;
+  }
+
+  .danger-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    border: 1px solid var(--danger);
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+
+  .danger-card.armed::before {
+    opacity: 0.3;
+  }
+
+  .danger-card.armed {
+    background: linear-gradient(135deg, var(--surface) 0%, rgba(192,57,43,0.04) 100%);
+  }
+
+  /* Collapsed header — mysterious */
+  .danger-header {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+    gap: 12px;
+  }
+
+  .redacted-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .redacted-bar {
+    height: 8px;
+    border-radius: 2px;
+    background: var(--surface2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .redacted-bar::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(255,255,255,0.03) 3px,
+      rgba(255,255,255,0.03) 4px
+    );
+  }
+
+  .redacted-bar.short { width: 60%; }
+
+  .redacted-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+  }
+
+  .chevron {
+    color: var(--text-dim);
+    font-size: 13px;
+    transition: transform 0.3s ease, color 0.3s;
+  }
+
+  .danger-card.open .chevron {
+    transform: rotate(180deg);
+    color: var(--danger);
+    opacity: 0.5;
+  }
+
+  /* Expanded content */
+  .danger-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .danger-card.open .danger-content {
+    max-height: 200px;
+  }
+
+  .danger-inner {
+    padding: 0 16px 18px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    padding-top: 14px;
+  }
+
+  .danger-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .danger-row-text {
+    flex: 1;
+  }
+
+  .danger-flag {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--danger);
+    letter-spacing: -0.01em;
+    opacity: 0.85;
+  }
+
+  .danger-desc {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* The toggle for danger mode */
+  .toggle.danger-toggle input:checked + .toggle-track {
+    background: var(--danger);
+    box-shadow: 0 0 12px rgba(192, 57, 43, 0.3);
+  }
+
+  .danger-warning {
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--danger);
+    opacity: 0;
+    transition: opacity 0.4s;
+    line-height: 1.6;
+  }
+
+  .danger-warning.visible {
+    opacity: 0.45;
+  }
+
+  /* Subtle grain overlay */
+  .grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-size: 128px;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="phone">
+
+  <!-- Header -->
+  <div class="header">
+    <span></span>
+    <h1>Settings</h1>
+    <button class="done-btn">Done</button>
+  </div>
+
+  <!-- Servers -->
+  <div class="section">
+    <div class="section-label">Servers <button class="plus-btn" style="float:right;margin-top:-2px">+</button></div>
+    <div class="card">
+      <div class="card-row">
+        <span class="dot"></span>
+        <div class="row-main">
+          <div class="row-title">theaf-web.ngrok.io</div>
+          <div class="row-sub">Bearer ••••2c7c</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agents -->
+  <div class="section">
+    <div class="section-label">Agents</div>
+    <div class="card">
+      <div class="card-row">
+        <span style="font-size:20px">🌊</span>
+        <div class="row-main">
+          <div class="row-title">Mave</div>
+        </div>
+        <span class="check">✓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Conversation — destructive but quiet -->
+  <div class="section">
+    <div class="card">
+      <div class="card-row" id="clearBtn" style="cursor:pointer;">
+        <div class="row-main">
+          <div class="row-title" style="color: var(--danger); opacity: 0.7; font-size:15px;">Clear Conversation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dangerous Section -->
+  <div class="section dangerous">
+
+    <!-- Subtle divider that makes you look twice -->
+    <div class="danger-divider">
+      <div class="danger-divider-line"></div>
+      <span class="danger-divider-label">advanced</span>
+      <div class="danger-divider-line"></div>
+    </div>
+
+    <div class="danger-card" id="dangerCard">
+      <!-- Collapsed: looks like a redacted document entry -->
+      <div class="danger-header" id="dangerHeader">
+        <div class="redacted-block">
+          <div class="redacted-tag" style="font-size:11px; opacity:0.35; letter-spacing:0.08em;">For advanced users only</div>
+        </div>
+        <span class="chevron">▾</span>
+      </div>
+
+      <!-- Expands to reveal the dangerous toggle -->
+      <div class="danger-content" id="dangerContent">
+        <div class="danger-inner">
+          <div class="danger-row">
+            <div class="danger-row-text">
+              <div class="danger-flag">--dangerously-skip-permissions</div>
+              <div class="danger-desc">skips all permission prompts.<br>claudio will not ask. claudio will act.</div>
+            </div>
+            <label class="toggle danger-toggle">
+              <input type="checkbox" id="dangerToggle">
+              <div class="toggle-track"></div>
+            </label>
+          </div>
+          <div class="danger-warning" id="dangerWarning">
+            ⚠ active — no guardrails. no confirmations.<br>you have been warned.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.getElementById('clearBtn').addEventListener('click', function() {
+    const title = this.querySelector('.row-title');
+    if (title.textContent === 'Clear Conversation') {
+      title.textContent = 'tap again to confirm';
+      title.style.opacity = '0.45';
+      title.style.fontSize = '13px';
+      title.style.fontFamily = 'var(--mono)';
+      setTimeout(() => {
+        title.textContent = 'Clear Conversation';
+        title.style.opacity = '0.7';
+        title.style.fontSize = '15px';
+        title.style.fontFamily = '';
+      }, 2500);
+    }
+  });
+
+  const card = document.getElementById('dangerCard');
+  const header = document.getElementById('dangerHeader');
+  const toggle = document.getElementById('dangerToggle');
+  const warning = document.getElementById('dangerWarning');
+
+  header.addEventListener('click', () => {
+    card.classList.toggle('open');
+  });
+
+  toggle.addEventListener('change', () => {
+    if (toggle.checked) {
+      card.classList.add('armed');
+      warning.classList.add('visible');
+    } else {
+      card.classList.remove('armed');
+      warning.classList.remove('visible');
+    }
+  });
+</script>
+</body>
+</html>

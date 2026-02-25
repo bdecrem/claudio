@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudio — Voice & Text for OpenClaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Geist+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f0c0a;
+    --bg-card:  #161210;
+    --terra:    #c4664a;
+    --terra-lt: #d4866a;
+    --gold:     #c4a45a;
+    --muted:    #6b5c52;
+    --text:     #d4c4bc;
+    --text-dim: #7a6a62;
+    --border:   rgba(196,102,74,0.14);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Fraunces', Georgia, serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 64px 0 48px;
+    text-align: center;
+  }
+
+  .mascot {
+    display: block;
+    margin: 0 auto 32px;
+    width: 82px;
+    height: 82px;
+    animation: idle 4s ease-in-out infinite;
+  }
+
+  @keyframes idle {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+  }
+
+  h1 {
+    font-size: clamp(2.8rem, 8vw, 4.2rem);
+    font-weight: 300;
+    font-style: italic;
+    color: var(--terra-lt);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+
+  /* ── Hero copy ── */
+  .hero-copy {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .hero-copy p.lead {
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 14px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-copy p.sub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Gallery ── */
+  .gallery {
+    margin-bottom: 52px;
+  }
+
+  .gallery-track-wrap {
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    /* phone-ish aspect ratio but contained */
+    max-width: 280px;
+    margin: 0 auto;
+    aspect-ratio: 9/16;
+    position: relative;
+  }
+
+  .gallery-track {
+    display: flex;
+    width: 200%;
+    height: 100%;
+    transition: transform 0.42s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .gallery-slide {
+    width: 50%;
+    height: 100%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 12px 12px;
+    gap: 8px;
+  }
+
+  .notch {
+    width: 38px;
+    height: 5px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 3px;
+    margin: 0 auto 4px;
+    flex-shrink: 0;
+  }
+
+  /* Text chat slide */
+  .ui-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-bottom: 4px;
+  }
+
+  .bubble {
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.6rem;
+    line-height: 1.45;
+    max-width: 85%;
+  }
+
+  .bubble.agent {
+    background: rgba(196,102,74,0.1);
+    border: 1px solid rgba(196,102,74,0.2);
+    color: var(--terra-lt);
+    align-self: flex-start;
+    border-radius: 3px 10px 10px 10px;
+  }
+
+  .bubble.user {
+    background: rgba(100,80,70,0.22);
+    border: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    align-self: flex-end;
+    border-radius: 10px 3px 10px 10px;
+  }
+
+  /* Voice slide */
+  .ui-voice {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+  }
+
+  .voice-ring {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(196,102,74,0.1);
+    border: 1.5px solid rgba(196,102,74,0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .voice-ring::before {
+    content: '';
+    position: absolute;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border: 1px solid rgba(196,102,74,0.1);
+    animation: pulse-ring 2.5s ease-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.88); opacity: 0.5; }
+    100% { transform: scale(1.3);  opacity: 0; }
+  }
+
+  .waveform {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 24px;
+  }
+
+  .waveform span {
+    display: block;
+    width: 2.5px;
+    background: var(--terra);
+    border-radius: 2px;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+
+  .waveform span:nth-child(1) { height: 6px;  animation-delay: 0s;    }
+  .waveform span:nth-child(2) { height: 14px; animation-delay: 0.1s;  }
+  .waveform span:nth-child(3) { height: 22px; animation-delay: 0.2s;  }
+  .waveform span:nth-child(4) { height: 10px; animation-delay: 0.3s;  }
+  .waveform span:nth-child(5) { height: 18px; animation-delay: 0.15s; }
+  .waveform span:nth-child(6) { height: 8px;  animation-delay: 0.25s; }
+  .waveform span:nth-child(7) { height: 14px; animation-delay: 0.05s; }
+
+  @keyframes wave {
+    0%,100% { transform: scaleY(1); }
+    50%      { transform: scaleY(0.35); }
+  }
+
+  .slide-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  /* Dots */
+  .gallery-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.35;
+    cursor: pointer;
+    transition: opacity 0.2s, background 0.2s, transform 0.2s;
+    border: none;
+    padding: 0;
+    appearance: none;
+  }
+
+  .dot.active {
+    background: var(--terra);
+    opacity: 1;
+    transform: scale(1.2);
+  }
+
+  /* ── Spec bullets ── */
+  .specs {
+    border-top: 1px solid var(--border);
+    padding: 32px 0 40px;
+    margin-bottom: 40px;
+  }
+
+  .spec-bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .spec-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: 300;
+  }
+
+  .spec-item::before {
+    content: '·';
+    color: var(--terra);
+    font-size: 1.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .spec-item a {
+    color: var(--terra-lt);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(196,102,74,0.28);
+    transition: border-color 0.2s;
+  }
+
+  .spec-item a:hover { border-color: var(--terra-lt); }
+
+  .spec-item .dim {
+    color: var(--text-dim);
+  }
+
+  /* ── CTA ── */
+  .cta-block {
+    text-align: center;
+    padding: 0 0 52px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-family: 'Fraunces', serif;
+    font-size: 0.93rem;
+    font-weight: 400;
+    text-decoration: none;
+    transition: all 0.2s;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-primary {
+    background: var(--terra);
+    color: #1a0f0a;
+    border: 1.5px solid var(--terra);
+  }
+
+  .btn-primary:hover {
+    background: var(--terra-lt);
+    border-color: var(--terra-lt);
+    transform: translateY(-1px);
+  }
+
+  .cta-note {
+    margin-top: 14px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .cta-note a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(107,92,82,0.35);
+  }
+
+  .cta-note a:hover { color: var(--text-dim); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+  footer a:hover { color: var(--muted); }
+  footer .links { display: flex; gap: 18px; }
+
+  /* ── Reveals ── */
+  .reveal { opacity: 0; transform: translateY(16px); animation: reveal 0.65s ease forwards; }
+  .r1 { animation-delay: 0.05s; }
+  .r2 { animation-delay: 0.15s; }
+  .r3 { animation-delay: 0.25s; }
+  .r4 { animation-delay: 0.35s; }
+  .r5 { animation-delay: 0.45s; }
+  .r6 { animation-delay: 0.55s; }
+
+  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 480px) {
+    footer { flex-direction: column; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="mascot reveal r1" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="37" y1="14" x2="32" y2="4" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="32" cy="3" r="2.2" fill="#c4664a"/>
+      <line x1="51" y1="14" x2="56" y2="4" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="56" cy="3" r="2.2" fill="#c4664a"/>
+      <circle cx="44" cy="32" r="20" fill="#b85c42"/>
+      <radialGradient id="hg" cx="38%" cy="30%" r="60%">
+        <stop offset="0%" stop-color="#d4806a" stop-opacity="0.6"/>
+        <stop offset="100%" stop-color="#8a3e2c" stop-opacity="0"/>
+      </radialGradient>
+      <circle cx="44" cy="32" r="20" fill="url(#hg)"/>
+      <circle cx="37" cy="31" r="6.5" fill="#1a0f0a"/>
+      <circle cx="51" cy="31" r="6.5" fill="#1a0f0a"/>
+      <circle cx="39" cy="29.5" r="1.8" fill="#c4943a" opacity="0.9"/>
+      <circle cx="53" cy="29.5" r="1.8" fill="#c4943a" opacity="0.9"/>
+      <circle cx="64.5" cy="32" r="2.5" fill="#c4a45a"/>
+      <rect x="32" y="50" width="24" height="22" rx="6" fill="#b05438"/>
+      <radialGradient id="bg2" cx="40%" cy="25%" r="70%">
+        <stop offset="0%" stop-color="#d0704e" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#8a3e2c" stop-opacity="0"/>
+      </radialGradient>
+      <rect x="32" y="50" width="24" height="22" rx="6" fill="url(#bg2)"/>
+      <rect x="20" y="52" width="10" height="8" rx="4" fill="#b05438"/>
+      <rect x="58" y="52" width="10" height="8" rx="4" fill="#b05438"/>
+      <rect x="35" y="70" width="7" height="10" rx="3.5" fill="#9a4830"/>
+      <rect x="46" y="70" width="7" height="10" rx="3.5" fill="#9a4830"/>
+    </svg>
+
+    <h1 class="reveal r2">Claudio</h1>
+    <p class="eyebrow reveal r2">Voice &amp; Text · OpenClaw Client</p>
+  </header>
+
+  <div class="hero-copy">
+    <p class="lead reveal r3">
+      A minimal iPhone client for talking to your OpenClaw agents —
+      by voice or by text. Hume.ai for voice. Full conversation context maintained.
+    </p>
+    <p class="sub reveal r3">v0.1 · made with care · no accounts · no data collection</p>
+  </div>
+
+  <!-- Gallery -->
+  <div class="gallery reveal r4">
+    <div class="gallery-track-wrap">
+      <div class="gallery-track" id="gallery-track">
+
+        <!-- Slide 1: Text chat -->
+        <div class="gallery-slide">
+          <div class="notch"></div>
+          <div class="ui-chat">
+            <div class="bubble agent">Sure — I can run that query against the DB right now.</div>
+            <div class="bubble user">check yesterday's errors</div>
+            <div class="bubble agent">Found 3 anomalies in the auth service. Want me to open a ticket?</div>
+            <div class="bubble user">yeah go ahead</div>
+            <div class="bubble agent">Done. Ticket #204 created and assigned.</div>
+          </div>
+          <div class="slide-label">Text chat</div>
+        </div>
+
+        <!-- Slide 2: Voice mode -->
+        <div class="gallery-slide">
+          <div class="notch"></div>
+          <div class="ui-voice">
+            <div class="voice-ring">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" fill="#c4664a" opacity="0.9"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+                <line x1="12" y1="19" x2="12" y2="22" stroke="#c4664a" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="waveform">
+              <span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="slide-label">Voice mode</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="gallery-dots">
+      <button class="dot active" data-index="0" aria-label="Text chat"></button>
+      <button class="dot"        data-index="1" aria-label="Voice mode"></button>
+    </div>
+  </div>
+
+  <!-- Spec bullets -->
+  <div class="specs reveal r5">
+    <div class="spec-bullets">
+      <div class="spec-item"><a href="https://hume.ai" target="_blank">Hume.ai EVI</a> for voice <span class="dim">— ElevenLabs coming</span></div>
+      <div class="spec-item">Self-hosted <a href="#" target="_blank">OpenClaw</a> backend via OpenAI-compatible API</div>
+      <div class="spec-item">Bearer token auth <span class="dim">— you paste yours, we never see it</span></div>
+      <div class="spec-item">iOS 17+ <span class="dim">— requires your own OpenClaw instance</span></div>
+      <div class="spec-item">No data collected. No account. Conversations stay on your server.</div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block reveal r6">
+    <a class="btn btn-primary" href="#">TestFlight Invite</a>
+    <p class="cta-note">Need help setting up? <a href="#">Join our Discord</a></p>
+  </div>
+
+  <footer class="reveal r6">
+    <span>© 2026 Kochito Labs</span>
+    <div class="links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  const track = document.getElementById('gallery-track');
+  const dots  = document.querySelectorAll('.dot');
+  let current = 0;
+
+  function goTo(i) {
+    current = i;
+    track.style.transform = `translateX(-${i * 50}%)`;
+    dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
+  }
+
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => goTo(+dot.dataset.index));
+  });
+
+  // Swipe support
+  let startX = 0;
+  const wrap = document.querySelector('.gallery-track-wrap');
+
+  wrap.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  wrap.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 40) goTo(dx < 0 ? 1 : 0);
+  });
+</script>
+</body>
+</html>
