@@ -85,7 +85,7 @@ private final class SpeechAnalyzerDemoService {
     private var analyzerTask: Task<Void, Never>?
 
     private var analyzer: SpeechAnalyzer?
-    private var transcriber: SpeechTranscriber?
+    private var usingDictation = false
 
     @MainActor
     func start() {
@@ -109,7 +109,8 @@ private final class SpeechAnalyzerDemoService {
                 try await self.startPipeline()
                 await MainActor.run {
                     self.isRunning = true
-                    self.status = "Listening... speak now"
+                    let mode = self.usingDictation ? "dictation" : "speech"
+                    self.status = "Listening (\(mode))... speak now"
                 }
             } catch {
                 await MainActor.run {
@@ -146,60 +147,106 @@ private final class SpeechAnalyzerDemoService {
     }
 
     private func requestMicrophonePermission() async -> Bool {
-        await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { granted in
-                continuation.resume(returning: granted)
+        let current = AVAudioApplication.shared.recordPermission
+        switch current {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        case .undetermined:
+            return await withCheckedContinuation { continuation in
+                AVAudioApplication.requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
             }
+        @unknown default:
+            return false
         }
     }
 
     private func startPipeline() async throws {
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: .current) else {
-            throw NSError(domain: "SpeechAnalyzerDemo", code: 1, userInfo: [NSLocalizedDescriptionKey: "Current locale not supported."])
-        }
-
-        let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
-        self.transcriber = transcriber
+        // Configure audio session BEFORE accessing inputNode format —
+        // the Simulator returns a zero-format otherwise.
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
 
         let inputFormat = audioEngine.inputNode.outputFormat(forBus: 0)
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+            throw NSError(domain: "SpeechAnalyzerDemo", code: 4, userInfo: [NSLocalizedDescriptionKey: "No valid audio input available. Check microphone access."])
+        }
+
+        // Try SpeechTranscriber first, fall back to DictationTranscriber
+        // (Simulator often lacks the on-device speech model)
+        let currentLocale = Locale.current
+        let speechLocales = await SpeechTranscriber.supportedLocales
+        let dictationLocales = await DictationTranscriber.supportedLocales
+        print("[SpeechDemo] Current locale: \(currentLocale.identifier)")
+        print("[SpeechDemo] SpeechTranscriber supportedLocales: \(speechLocales.map(\.identifier))")
+        print("[SpeechDemo] DictationTranscriber supportedLocales: \(dictationLocales.map(\.identifier))")
+
+        let module: any LocaleDependentSpeechModule
+        if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: currentLocale) {
+            let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+            module = transcriber
+            usingDictation = false
+
+            resultsTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    for try await result in transcriber.results {
+                        await MainActor.run {
+                            self.transcript = String(describing: result.text)
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.status = "Transcription error"
+                    }
+                }
+            }
+        } else if let locale = await DictationTranscriber.supportedLocale(equivalentTo: currentLocale) {
+            let transcriber = DictationTranscriber(locale: locale, preset: .progressiveShortDictation)
+            module = transcriber
+            usingDictation = true
+
+            resultsTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    for try await result in transcriber.results {
+                        await MainActor.run {
+                            self.transcript = String(describing: result.text)
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                        self.status = "Transcription error"
+                    }
+                }
+            }
+        } else {
+            throw NSError(domain: "SpeechAnalyzerDemo", code: 1, userInfo: [NSLocalizedDescriptionKey: "Current locale not supported by any available transcriber."])
+        }
+
         let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
-            compatibleWith: [transcriber],
+            compatibleWith: [module],
             considering: inputFormat
         ) ?? inputFormat
 
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let analyzer = SpeechAnalyzer(modules: [module])
         self.analyzer = analyzer
 
         let stream = AsyncStream<AnalyzerInput>.makeStream()
         inputContinuation = stream.continuation
 
-        resultsTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                for try await result in transcriber.results {
-                    await MainActor.run {
-                        self.transcript = String(describing: result.text)
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    self.errorMessage = error.localizedDescription
-                    self.status = "Transcription error"
-                }
-            }
-        }
-
-        try configureAudioEngine(targetFormat: analyzerFormat)
+        try configureAudioEngine(targetFormat: analyzerFormat, inputFormat: inputFormat)
         try await analyzer.start(inputSequence: stream.stream)
     }
 
-    private func configureAudioEngine(targetFormat: AVAudioFormat) throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-
+    private func configureAudioEngine(targetFormat: AVAudioFormat, inputFormat: AVAudioFormat) throws {
         let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
 
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in

@@ -99,7 +99,8 @@ struct ChatView: View {
                                     get: { chatService.selectedAgent },
                                     set: { chatService.selectedAgent = $0 }
                                 ),
-                                agents: chatService.visibleAgents
+                                agents: chatService.visibleAgents,
+                                unreadAgentIds: chatService.unreadAgentIds
                             )
                             .padding(.horizontal, 16)
                         }

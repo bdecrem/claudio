@@ -1,8 +1,62 @@
 # Claudio
 
-USE THE XCODE CLI - DO NOT BE LAZY!!!!
-
 Native iPhone client for OpenClaw — a self-hosted AI agent backend. The app is purely a client: the backend handles all AI logic, tool calls, memory, and TTS proxying. Users configure one server URL and go.
+
+## Apple Documentation
+
+An Apple Docs MCP server is configured in `.mcp.json`. When working with Apple frameworks and APIs, don't guess — look it up. Use `search_apple_docs`, `get_apple_doc_content`, and related MCP tools to verify API signatures, availability, and correct usage before writing code.
+
+## Build Verification
+
+After modifying Swift files, ALWAYS build to catch compile errors:
+
+```
+xcodebuild -project Claudio.xcodeproj -scheme Claudio -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone Air' build 2>&1 | tail -20
+```
+
+If the build fails, fix the errors before moving on. Do not skip this step.
+
+After build succeeds, run unit tests:
+
+```
+xcodebuild -project Claudio.xcodeproj -scheme Claudio -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone Air' test 2>&1 | tail -30
+```
+
+If any tests fail, fix them before moving on. When adding new parsing logic or modifying models, add tests in `ClaudioTests/`.
+
+To take a simulator screenshot:
+
+```
+xcrun simctl io booted screenshot screenshot.png
+```
+
+## Test Coverage
+
+Tests live in `ClaudioTests/`. Current test files:
+
+**RPCTypesTests.swift** (18 tests) — Wire format parsing:
+- `AnyCodableValue` type accessors and coercion (string, int, double, bool, null)
+- `AnyCodableValue` JSON encode/decode round-trip
+- `ChatEvent` parsing: delta, final, invalid state, nil payload
+- `AgentEvent` parsing: args flattening (int/double/bool → string), missing fields
+- `HistoryMessage` parsing: plain string, content blocks, empty content skipping
+- `WSAgent` parsing: full fields, name fallback to id, missing id rejection
+
+**ChatServiceTests.swift** (14 tests) — State management:
+- Message Codable round-trip (fields survive encode/decode)
+- Streaming messages always restore as non-streaming
+- Message array serialization
+- API representation output
+- Agent switching preserves per-agent chat history
+- Switching to same agent is a no-op
+- Agent visibility toggling (hide/show)
+- Cannot hide the last visible agent
+- Hiding selected agent auto-switches to first visible
+- Clear messages resets messages and errors
+- Chat state persists to and restores from UserDefaults
+- Stale chat state (>24h) is discarded
+- Fresh init has no servers
+- ToolCall.isComplete
 
 ## Architecture
 

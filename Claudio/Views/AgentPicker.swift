@@ -3,6 +3,7 @@ import SwiftUI
 struct AgentPicker: View {
     @Binding var selected: String
     let agents: [ChatService.Agent]
+    var unreadAgentIds: Set<String> = []
 
     var body: some View {
         if agents.isEmpty {
@@ -48,6 +49,14 @@ struct AgentPicker: View {
                                         lineWidth: 1
                                     )
                             )
+                            .overlay(alignment: .topTrailing) {
+                                if !isSelected && unreadAgentIds.contains(agent.id) {
+                                    Circle()
+                                        .fill(Theme.accent)
+                                        .frame(width: 6, height: 6)
+                                        .offset(x: -2, y: -1)
+                                }
+                            }
                         }
                     }
                 }
