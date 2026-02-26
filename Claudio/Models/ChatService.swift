@@ -13,6 +13,7 @@ final class ChatService {
     var agentFetchFailed = false
     var connectionError: String?
     var wsConnectionState: WebSocketClient.ConnectionState = .disconnected
+    var unreadAgentIds: Set<String> = []
 
     // Per-agent chat history
     private var chatHistories: [String: [Message]] = [:]
@@ -84,6 +85,7 @@ final class ChatService {
         didSet {
             guard oldValue != selectedAgent else { return }
             UserDefaults.standard.set(selectedAgent, forKey: "selectedAgent")
+            unreadAgentIds.remove(selectedAgent)
             if !oldValue.isEmpty {
                 chatHistories[oldValue] = messages
             }
@@ -279,6 +281,9 @@ final class ChatService {
 
         // Load chat history
         await loadChatHistory()
+
+        // Register APNs token if available
+        await NotificationService.shared.registerTokenIfNeeded(via: webSocketClient)
     }
 
     @MainActor
@@ -340,8 +345,39 @@ final class ChatService {
 
     // MARK: - Chat Events
 
+    /// Map a sessionKey like "agent:mave:main" to the composite agent ID like "0:mave"
+    private func compositeIdFromSessionKey(_ sessionKey: String) -> String? {
+        let parts = sessionKey.split(separator: ":")
+        guard parts.count >= 2, parts[0] == "agent" else { return nil }
+        let rawAgentId = String(parts[1])
+        return agents.first(where: { $0.agentId == rawAgentId })?.id
+    }
+
     @MainActor
     private func handleChatEvent(_ event: ChatEvent) {
+        // Mark as unread if this event is for a non-selected agent
+        if !event.sessionKey.isEmpty,
+           let compositeId = compositeIdFromSessionKey(event.sessionKey),
+           compositeId != selectedAgent {
+            unreadAgentIds.insert(compositeId)
+            // Store the message in the correct agent's history
+            if event.state == .delta, let text = event.text {
+                if chatHistories[compositeId] == nil {
+                    chatHistories[compositeId] = []
+                }
+                // Only append if there's no streaming message for this agent yet
+                // (handled below for the selected agent; for background agents, just update history on final)
+            }
+            if event.state == .final_, let text = event.text, !text.isEmpty {
+                if chatHistories[compositeId] == nil {
+                    chatHistories[compositeId] = []
+                }
+                chatHistories[compositeId]?.append(Message(role: .assistant, content: text))
+                persistChatHistories()
+            }
+            return
+        }
+
         switch event.state {
         case .delta:
             guard let text = event.text else { return }

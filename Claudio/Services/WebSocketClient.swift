@@ -159,6 +159,16 @@ actor WebSocketClient {
         return agentsArray.compactMap { WSAgent(from: $0) }
     }
 
+    // MARK: - Device Registration
+
+    func registerApnsToken(_ token: String, bundleId: String) async throws {
+        let params: [String: AnyCodableValue] = [
+            "token": .string(token),
+            "bundleId": .string(bundleId)
+        ]
+        _ = try await send(method: "device.registerApnsToken", params: params)
+    }
+
     // MARK: - Connection Flow
 
     private func doConnect() async {

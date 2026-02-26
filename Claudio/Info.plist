@@ -6,6 +6,10 @@
 	<string>Claudio needs microphone access for voice input.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Claudio uses speech recognition to convert your voice to text.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

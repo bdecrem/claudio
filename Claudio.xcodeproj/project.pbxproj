@@ -29,6 +29,10 @@
 		E10000010000000000000002 /* RPCTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000002 /* RPCTypes.swift */; };
 		E10000010000000000000003 /* WebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000003 /* WebSocketClient.swift */; };
 		F10000010000000000000001 /* ToolCallCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000001 /* ToolCallCard.swift */; };
+		N10000010000000000000001 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000001 /* NotificationService.swift */; };
+		N10000010000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000002 /* AppDelegate.swift */; };
+		T10000010000000000000001 /* RPCTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000001 /* RPCTypesTests.swift */; };
+		T10000010000000000000002 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000002 /* ChatServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,10 +60,33 @@
 		E20000010000000000000002 /* RPCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypes.swift; sourceTree = "<group>"; };
 		E20000010000000000000003 /* WebSocketClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
 		F20000010000000000000001 /* ToolCallCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallCard.swift; sourceTree = "<group>"; };
+		N20000010000000000000001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		N20000010000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		N20000010000000000000003 /* Claudio.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Claudio.entitlements; sourceTree = "<group>"; };
+		T20000010000000000000001 /* RPCTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypesTests.swift; sourceTree = "<group>"; };
+		T20000010000000000000002 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
+		T30000010000000000000001 /* ClaudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		T40000010000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A60000010000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000010000000000000001;
+			remoteInfo = Claudio;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A40000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T50000010000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -73,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				A50000010000000000000002 /* Claudio */,
+				T60000010000000000000001 /* ClaudioTests */,
 				A50000010000000000000007 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -82,6 +110,7 @@
 			children = (
 				A20000010000000000000001 /* ClaudioApp.swift */,
 				A2000001000000000000000D /* Info.plist */,
+				N20000010000000000000003 /* Claudio.entitlements */,
 				D10000010000000000000002 /* PrivacyInfo.xcprivacy */,
 				A2000001000000000000000F /* Assets.xcassets */,
 				A50000010000000000000003 /* Models */,
@@ -127,6 +156,8 @@
 				C20000010000000000000001 /* ChaosService.swift */,
 				E20000010000000000000001 /* DeviceIdentity.swift */,
 				E20000010000000000000003 /* WebSocketClient.swift */,
+				N20000010000000000000001 /* NotificationService.swift */,
+				N20000010000000000000002 /* AppDelegate.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -143,8 +174,18 @@
 			isa = PBXGroup;
 			children = (
 				A30000010000000000000001 /* Claudio.app */,
+				T30000010000000000000001 /* ClaudioTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		T60000010000000000000001 /* ClaudioTests */ = {
+			isa = PBXGroup;
+			children = (
+				T20000010000000000000001 /* RPCTypesTests.swift */,
+				T20000010000000000000002 /* ChatServiceTests.swift */,
+			);
+			path = ClaudioTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -169,6 +210,23 @@
 			productReference = A30000010000000000000001 /* Claudio.app */;
 			productType = "com.apple.product-type.application";
 		};
+		T70000010000000000000001 /* ClaudioTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T80000010000000000000003 /* Build configuration list for PBXNativeTarget "ClaudioTests" */;
+			buildPhases = (
+				T90000010000000000000001 /* Sources */,
+				T50000010000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TA0000010000000000000001 /* PBXTargetDependency */,
+			);
+			name = ClaudioTests;
+			productName = ClaudioTests;
+			productReference = T30000010000000000000001 /* ClaudioTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -181,6 +239,10 @@
 				TargetAttributes = {
 					A60000010000000000000001 = {
 						CreatedOnToolsVersion = 15.4;
+					};
+					T70000010000000000000001 = {
+						CreatedOnToolsVersion = 15.4;
+						TestTargetID = A60000010000000000000001;
 					};
 				};
 			};
@@ -200,9 +262,18 @@
 			projectRoot = "";
 			targets = (
 				A60000010000000000000001 /* Claudio */,
+				T70000010000000000000001 /* ClaudioTests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXTargetDependency section */
+		TA0000010000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A60000010000000000000001 /* Claudio */;
+			targetProxy = T40000010000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A90000010000000000000001 /* Resources */ = {
@@ -241,6 +312,17 @@
 				E10000010000000000000002 /* RPCTypes.swift in Sources */,
 				E10000010000000000000003 /* WebSocketClient.swift in Sources */,
 				F10000010000000000000001 /* ToolCallCard.swift in Sources */,
+				N10000010000000000000001 /* NotificationService.swift in Sources */,
+				N10000010000000000000002 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T90000010000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T10000010000000000000001 /* RPCTypesTests.swift in Sources */,
+				T10000010000000000000002 /* ChatServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,6 +386,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Claudio/Claudio.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 274T5WCVD2;
@@ -332,6 +415,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Claudio/Claudio.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 274T5WCVD2;
@@ -356,6 +440,44 @@
 			};
 			name = Release;
 		};
+		T80000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 274T5WCVD2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Claudio.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Claudio";
+			};
+			name = Debug;
+		};
+		T80000010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 274T5WCVD2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Claudio.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Claudio";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -373,6 +495,15 @@
 			buildConfigurations = (
 				A80000010000000000000006 /* Debug */,
 				A80000010000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		T80000010000000000000003 /* Build configuration list for PBXNativeTarget "ClaudioTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T80000010000000000000001 /* Debug */,
+				T80000010000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

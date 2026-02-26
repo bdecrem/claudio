@@ -151,6 +151,9 @@ struct SettingsView: View {
                         }
                     }
 
+                    // MARK: - Notifications
+                    NotificationSettingsSection(cardRadius: cardRadius)
+
                     if chatService.agentFetchFailed {
                         SettingsSection(title: "Agent") {
                             VStack(alignment: .leading, spacing: Theme.spacing) {
@@ -525,6 +528,114 @@ private struct ServerEditSheet: View {
             .foregroundStyle(Theme.textPrimary)
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Notification Settings
+
+private struct NotificationSettingsSection: View {
+    let cardRadius: CGFloat
+    private var notificationService: NotificationService { .shared }
+
+    var body: some View {
+        SettingsSection(title: "Notifications") {
+            VStack(spacing: 0) {
+                // Master toggle
+                HStack {
+                    Text("Push Notifications")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { notificationService.notificationsEnabled },
+                        set: { newValue in
+                            if newValue {
+                                Task {
+                                    if notificationService.permissionState == .denied {
+                                        openAppSettings()
+                                    } else {
+                                        await notificationService.requestPermission()
+                                        if notificationService.permissionState == .authorized {
+                                            notificationService.notificationsEnabled = true
+                                        }
+                                    }
+                                }
+                            } else {
+                                notificationService.notificationsEnabled = false
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(Theme.accent)
+                }
+                .padding(14)
+
+                if notificationService.notificationsEnabled {
+                    Divider().background(Theme.border).padding(.leading, 16)
+
+                    // Sub-toggles
+                    notificationToggle("Agent Messages", isOn: Binding(
+                        get: { notificationService.notifyAgentMessages },
+                        set: { notificationService.notifyAgentMessages = $0 }
+                    ))
+
+                    Divider().background(Theme.border).padding(.leading, 16)
+
+                    notificationToggle("Mentions", isOn: Binding(
+                        get: { notificationService.notifyMentions },
+                        set: { notificationService.notifyMentions = $0 }
+                    ))
+
+                    Divider().background(Theme.border).padding(.leading, 16)
+
+                    notificationToggle("All Events", isOn: Binding(
+                        get: { notificationService.notifyAllEvents },
+                        set: { notificationService.notifyAllEvents = $0 }
+                    ))
+                }
+
+                if notificationService.permissionState == .denied {
+                    Divider().background(Theme.border).padding(.leading, 16)
+
+                    Button { openAppSettings() } label: {
+                        HStack {
+                            Text("Notifications disabled in system settings")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textSecondary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .padding(14)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+        }
+    }
+
+    private func notificationToggle(_ label: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.textPrimary)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private func openAppSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
     }
 }
 

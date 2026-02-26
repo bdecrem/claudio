@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ClaudioApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var showLaunch = true
 
     var body: some Scene {
