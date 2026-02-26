@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct ChatView: View {
     @State private var chatService = ChatService()
@@ -8,6 +9,9 @@ struct ChatView: View {
     @State private var voiceEnabled = false
     @State private var showSettings = false
     @State private var showVoiceSession = false
+    @State private var pendingImages: [ImageAttachment] = []
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var showPhotoPicker = false
 
     var body: some View {
         ZStack {
@@ -224,6 +228,38 @@ struct ChatView: View {
                         }
                     }
 
+                    // Pending image thumbnails
+                    if !pendingImages.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(pendingImages) { img in
+                                    ZStack(alignment: .topTrailing) {
+                                        if let uiImage = UIImage(data: img.data) {
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 56, height: 56)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        }
+                                        Button {
+                                            pendingImages.removeAll { $0.id == img.id }
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundStyle(Theme.background)
+                                                .frame(width: 16, height: 16)
+                                                .background(Theme.textSecondary, in: Circle())
+                                        }
+                                        .offset(x: 4, y: -4)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                        .padding(.bottom, 4)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+
                     // Input
                     InputBar(
                         text: $messageText,
@@ -234,6 +270,7 @@ struct ChatView: View {
                         audioLevel: speechRecognizer.audioLevel,
                         transcript: speechRecognizer.transcript,
                         isSpeaking: chatService.isSpeaking,
+                        pendingImageCount: pendingImages.count,
                         onSend: sendTextMessage,
                         onToggleVoice: {
                             HapticsManager.tap()
@@ -253,6 +290,9 @@ struct ChatView: View {
                         },
                         onStopSpeaking: {
                             chatService.stopSpeaking()
+                        },
+                        onPickImage: {
+                            showPhotoPicker = true
                         }
                     )
                 }
@@ -260,6 +300,11 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(chatService: chatService)
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 4, matching: .images)
+        .onChange(of: selectedPhotos) { _, items in
+            Task { await loadSelectedPhotos(items) }
+            selectedPhotos = []
         }
         .fullScreenCover(isPresented: $showVoiceSession) {
             VoiceSessionView(
@@ -330,9 +375,40 @@ struct ChatView: View {
 
     private func sendTextMessage() {
         let text = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || !pendingImages.isEmpty else { return }
+        let images = pendingImages
         messageText = ""
-        chatService.sendMessage(text, playVoice: voiceEnabled)
+        pendingImages = []
+        chatService.sendMessage(
+            text.isEmpty ? "What's in this image?" : text,
+            playVoice: voiceEnabled,
+            imageAttachments: images
+        )
+    }
+
+    private func loadSelectedPhotos(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { continue }
+            guard let resized = resizeImageData(data, maxDimension: 1024) else { continue }
+            let attachment = ImageAttachment(
+                filename: "photo.jpg",
+                contentType: "image/jpeg",
+                data: resized
+            )
+            await MainActor.run { pendingImages.append(attachment) }
+        }
+    }
+
+    private func resizeImageData(_ data: Data, maxDimension: CGFloat) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let size = image.size
+        let scale = min(maxDimension / max(size.width, size.height), 1.0)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        return resized.jpegData(compressionQuality: 0.7)
     }
 
     private func startVoiceSession() {

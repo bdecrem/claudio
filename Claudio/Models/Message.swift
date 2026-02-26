@@ -1,5 +1,12 @@
 import Foundation
 
+struct ImageAttachment: Identifiable, Equatable {
+    let id = UUID()
+    let filename: String
+    let contentType: String
+    let data: Data
+}
+
 struct Message: Identifiable, Equatable {
     let id: UUID
     let role: Role
@@ -7,6 +14,7 @@ struct Message: Identifiable, Equatable {
     let timestamp: Date
     var isStreaming: Bool
     var toolCalls: [ToolCall]
+    var imageAttachments: [ImageAttachment]
 
     enum Role: String, Codable {
         case user
@@ -14,13 +22,14 @@ struct Message: Identifiable, Equatable {
         case system
     }
 
-    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = []) {
+    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = [], imageAttachments: [ImageAttachment] = []) {
         self.id = id
         self.role = role
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
         self.toolCalls = toolCalls
+        self.imageAttachments = imageAttachments
     }
 
     var apiRepresentation: [String: String] {
@@ -53,6 +62,7 @@ extension Message: Codable {
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         isStreaming = false
         toolCalls = []
+        imageAttachments = []
     }
 
     func encode(to encoder: Encoder) throws {

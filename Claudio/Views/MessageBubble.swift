@@ -31,6 +31,25 @@ struct MessageBubble: View {
                 .padding(.bottom, 4)
             }
 
+            // Image attachments
+            if !message.imageAttachments.isEmpty {
+                HStack {
+                    if message.role == .user { Spacer(minLength: 60) }
+                    HStack(spacing: 6) {
+                        ForEach(message.imageAttachments) { img in
+                            if let uiImage = UIImage(data: img.data) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: 200, maxHeight: 200)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                        }
+                    }
+                    if message.role == .assistant { Spacer(minLength: 60) }
+                }
+            }
+
             // Bubble
             HStack {
                 if message.role == .user { Spacer(minLength: 60) }
@@ -54,8 +73,8 @@ struct MessageBubble: View {
                 .background(bubbleBackground)
                 .overlay(bubbleOverlay)
                 // Hide empty bubble when only tool calls are showing
-                .opacity(message.content.isEmpty && !message.isStreaming ? 0 : 1)
-                .frame(height: message.content.isEmpty && !message.isStreaming ? 0 : nil)
+                .opacity(message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty ? 0 : 1)
+                .frame(height: message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty ? 0 : nil)
 
                 if message.role == .assistant { Spacer(minLength: 60) }
             }

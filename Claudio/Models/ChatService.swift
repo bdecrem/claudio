@@ -480,8 +480,8 @@ final class ChatService {
 
     // MARK: - Chat
 
-    func sendMessage(_ content: String, playVoice: Bool = false) {
-        let userMessage = Message(role: .user, content: content)
+    func sendMessage(_ content: String, playVoice: Bool = false, imageAttachments: [ImageAttachment] = []) {
+        let userMessage = Message(role: .user, content: content, imageAttachments: imageAttachments)
         messages.append(userMessage)
         connectionError = nil
         persistChatHistories()
@@ -492,11 +492,20 @@ final class ChatService {
         isLoading = isLoadingCurrentAgent
         pendingVoiceTTS = playVoice
 
-        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) playVoice=\(playVoice)")
+        // Convert image attachments to base64 dicts for the wire
+        let wireAttachments: [[String: String]] = imageAttachments.map { img in
+            [
+                "filename": img.filename,
+                "contentType": img.contentType,
+                "data": img.data.base64EncodedString()
+            ]
+        }
+
+        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count)")
 
         Task {
             do {
-                _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content)
+                _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content, attachments: wireAttachments)
             } catch {
                 log.error("sendMessage failed: \(error)")
                 await MainActor.run {

@@ -120,13 +120,19 @@ actor WebSocketClient {
         return messagesArray.compactMap { HistoryMessage(from: $0) }
     }
 
-    func chatSend(sessionKey: String, message: String) async throws -> String? {
-        let params: [String: AnyCodableValue] = [
+    func chatSend(sessionKey: String, message: String, attachments: [[String: String]] = []) async throws -> String? {
+        var params: [String: AnyCodableValue] = [
             "sessionKey": .string(sessionKey),
             "message": .string(message),
             "deliver": .bool(false),
             "idempotencyKey": .string(UUID().uuidString)
         ]
+        if !attachments.isEmpty {
+            let encoded: [AnyCodableValue] = attachments.map { dict in
+                .object(dict.mapValues { .string($0) })
+            }
+            params["attachments"] = .array(encoded)
+        }
         let response = try await send(method: "chat.send", params: params)
 
         guard response.ok else {

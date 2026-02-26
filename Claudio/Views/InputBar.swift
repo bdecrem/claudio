@@ -9,11 +9,13 @@ struct InputBar: View {
     let audioLevel: Float
     let transcript: String
     let isSpeaking: Bool
+    let pendingImageCount: Int
     let onSend: () -> Void
     let onToggleVoice: () -> Void
     let onMicDown: () -> Void
     let onMicUp: () -> Void
     let onStopSpeaking: () -> Void
+    let onPickImage: () -> Void
 
     @FocusState private var isFocused: Bool
 
@@ -54,6 +56,26 @@ struct InputBar: View {
 
             // Input row
             HStack(spacing: Theme.spacing) {
+                // Image picker
+                Button { onPickImage() } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(pendingImageCount > 0 ? Theme.accent : Theme.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(Theme.surface, in: Circle())
+                        .overlay {
+                            if pendingImageCount > 0 {
+                                Text("\(pendingImageCount)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(Theme.background)
+                                    .frame(width: 14, height: 14)
+                                    .background(Theme.accent, in: Circle())
+                                    .offset(x: 10, y: -10)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+
                 // Text field with border
                 HStack(spacing: Theme.spacing) {
                     TextField("", text: $text, prompt:
