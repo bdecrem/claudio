@@ -50,6 +50,36 @@ final class ChatService {
     /// Whether the user has configured at least one server
     var hasServer: Bool { !savedServers.isEmpty }
 
+    var hiddenAgentIds: Set<String> {
+        didSet {
+            if let data = try? JSONEncoder().encode(hiddenAgentIds) {
+                UserDefaults.standard.set(data, forKey: "hiddenAgentIds")
+            }
+        }
+    }
+
+    var visibleAgents: [Agent] {
+        agents.filter { !hiddenAgentIds.contains($0.id) }
+    }
+
+    func toggleAgentVisibility(_ agentId: String) {
+        if hiddenAgentIds.contains(agentId) {
+            hiddenAgentIds.remove(agentId)
+        } else {
+            // Don't hide if it's the last visible agent
+            let visibleCount = agents.filter { !hiddenAgentIds.contains($0.id) }.count
+            guard visibleCount > 1 else { return }
+            hiddenAgentIds.insert(agentId)
+            // If hiding the selected agent, switch to first visible
+            if selectedAgent == agentId {
+                let visible = agents.filter { !hiddenAgentIds.contains($0.id) }
+                if let first = visible.first {
+                    selectedAgent = first.id
+                }
+            }
+        }
+    }
+
     var selectedAgent: String {
         didSet {
             guard oldValue != selectedAgent else { return }
@@ -74,6 +104,13 @@ final class ChatService {
     init() {
         self.selectedAgent = UserDefaults.standard.string(forKey: "selectedAgent") ?? ""
         self.activeServerIndex = UserDefaults.standard.integer(forKey: "activeServerIndex")
+
+        if let hiddenData = UserDefaults.standard.data(forKey: "hiddenAgentIds"),
+           let decoded = try? JSONDecoder().decode(Set<String>.self, from: hiddenData) {
+            self.hiddenAgentIds = decoded
+        } else {
+            self.hiddenAgentIds = []
+        }
 
         if let data = UserDefaults.standard.data(forKey: "savedServers"),
            let decoded = try? JSONDecoder().decode([CodableServer].self, from: data) {

@@ -59,11 +59,11 @@ struct ChatView: View {
 
                                 HStack(spacing: 5) {
                                     Circle()
-                                        .fill(connectionStatusColor)
+                                        .fill(Theme.green)
                                         .frame(width: 6, height: 6)
-                                        .shadow(color: connectionStatusColor.opacity(0.6), radius: 3)
+                                        .shadow(color: Theme.green.opacity(0.6), radius: 3)
                                         .modifier(PulseOpacity())
-                                    Text(connectionStatusText)
+                                    Text("online")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(Theme.textSecondary)
                                 }
@@ -88,14 +88,14 @@ struct ChatView: View {
                     }
 
                     // Agent switcher pills
-                    if chatService.visibleAgents.count > 1 {
+                    if chatService.agents.count > 1 {
                         ScrollView(.horizontal, showsIndicators: false) {
                             AgentPicker(
                                 selected: Binding(
                                     get: { chatService.selectedAgent },
                                     set: { chatService.selectedAgent = $0 }
                                 ),
-                                agents: chatService.visibleAgents
+                                agents: chatService.agents
                             )
                             .padding(.horizontal, 16)
                         }
@@ -272,7 +272,7 @@ struct ChatView: View {
         .onAppear {
             speechRecognizer.requestAuthorization()
             if chatService.hasServer {
-                chatService.connectWebSocket()
+                Task { await chatService.fetchAgents() }
             }
             if ChaosService.shared.shouldCheckNow {
                 Task {
@@ -299,25 +299,6 @@ struct ChatView: View {
             return agent.name
         }
         return chatService.selectedAgent.isEmpty ? "Claudio" : chatService.selectedAgent
-    }
-
-    private var connectionStatusColor: Color {
-        switch chatService.wsConnectionState {
-        case .connected: return Theme.green
-        case .connecting: return Theme.accent
-        case .error, .pairingRequired: return Theme.danger
-        case .disconnected: return Theme.textSecondary
-        }
-    }
-
-    private var connectionStatusText: String {
-        switch chatService.wsConnectionState {
-        case .connected: return "online"
-        case .connecting: return "connecting"
-        case .error: return "error"
-        case .pairingRequired: return "pairing needed"
-        case .disconnected: return "offline"
-        }
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
