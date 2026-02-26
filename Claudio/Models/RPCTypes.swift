@@ -76,32 +76,31 @@ struct ChatEvent {
 struct AgentEvent {
     let sessionKey: String
     let runId: String
-    let kind: Kind
-    let callId: String
+    let stream: String       // "tool", "lifecycle", "assistant"
+    let phase: String         // "start", "update", "result", "end"
+    let callId: String?
     let toolName: String?
     let args: [String: String]?
-    let output: String?
-
-    enum Kind: String {
-        case toolUse = "tool_use"
-        case toolResult = "tool_result"
-    }
+    let meta: String?         // tool result summary (e.g. the command that ran)
+    let isError: Bool
 
     init?(from payload: [String: AnyCodableValue]?) {
-        guard let payload else { return nil }
+        guard let payload,
+              let stream = payload["stream"]?.stringValue,
+              let data = payload["data"]?.objectValue,
+              let phase = data["phase"]?.stringValue else { return nil }
 
         self.sessionKey = payload["sessionKey"]?.stringValue ?? ""
         self.runId = payload["runId"]?.stringValue ?? ""
-
-        guard let kindStr = payload["kind"]?.stringValue,
-              let kind = Kind(rawValue: kindStr) else { return nil }
-        self.kind = kind
-
-        self.callId = payload["callId"]?.stringValue ?? ""
-        self.toolName = payload["name"]?.stringValue
+        self.stream = stream
+        self.phase = phase
+        self.callId = data["toolCallId"]?.stringValue
+        self.toolName = data["name"]?.stringValue
+        self.isError = data["isError"]?.boolValue ?? false
+        self.meta = data["meta"]?.stringValue
 
         // Parse args — flatten to [String: String] for display
-        if let argsObj = payload["args"]?.objectValue {
+        if let argsObj = data["args"]?.objectValue {
             var flat: [String: String] = [:]
             for (k, v) in argsObj {
                 switch v {
@@ -116,8 +115,6 @@ struct AgentEvent {
         } else {
             self.args = nil
         }
-
-        self.output = payload["output"]?.stringValue
     }
 }
 

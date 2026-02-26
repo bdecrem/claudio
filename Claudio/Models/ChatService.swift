@@ -403,10 +403,14 @@ final class ChatService {
 
     @MainActor
     private func handleAgentEvent(_ event: AgentEvent) {
-        switch event.kind {
-        case .toolUse:
+        // Only handle tool stream events
+        guard event.stream == "tool" else { return }
+
+        switch event.phase {
+        case "start":
+            guard let callId = event.callId else { return }
             let toolCall = ToolCall(
-                id: event.callId,
+                id: callId,
                 name: event.toolName ?? "tool",
                 args: event.args ?? [:]
             )
@@ -423,13 +427,17 @@ final class ChatService {
                 streamingMessageId = placeholder.id
             }
 
-        case .toolResult:
-            // Find the tool call by callId and set its output
+        case "result":
+            // Find the tool call by callId and mark it complete
+            guard let callId = event.callId else { return }
             if let msgId = streamingMessageId,
                let msgIdx = messages.firstIndex(where: { $0.id == msgId }),
-               let tcIdx = messages[msgIdx].toolCalls.firstIndex(where: { $0.id == event.callId }) {
-                messages[msgIdx].toolCalls[tcIdx].output = event.output ?? ""
+               let tcIdx = messages[msgIdx].toolCalls.firstIndex(where: { $0.id == callId }) {
+                messages[msgIdx].toolCalls[tcIdx].output = event.meta ?? (event.isError ? "error" : "done")
             }
+
+        default:
+            break
         }
     }
 
