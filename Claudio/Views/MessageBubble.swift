@@ -21,19 +21,41 @@ struct MessageBubble: View {
                 .padding(.bottom, 2)
             }
 
+            // Tool calls (above the text bubble for assistant messages)
+            if message.role == .assistant, !message.toolCalls.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(message.toolCalls) { tc in
+                        ToolCallCard(toolCall: tc)
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+
             // Bubble
             HStack {
                 if message.role == .user { Spacer(minLength: 60) }
 
-                Text(message.content)
-                    .font(.system(size: 15, weight: .light, design: .serif))
-                    .foregroundStyle(Theme.textPrimary)
-                    .textSelection(.enabled)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(bubbleBackground)
-                    .overlay(bubbleOverlay)
+                HStack(spacing: 0) {
+                    if !message.content.isEmpty {
+                        Text(message.content)
+                            .font(.system(size: 15, weight: .light, design: .serif))
+                            .foregroundStyle(Theme.textPrimary)
+                            .textSelection(.enabled)
+                            .lineSpacing(3)
+                    }
+
+                    if message.isStreaming {
+                        StreamingCursor()
+                            .padding(.leading, 1)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(bubbleBackground)
+                .overlay(bubbleOverlay)
+                // Hide empty bubble when only tool calls are showing
+                .opacity(message.content.isEmpty && !message.isStreaming ? 0 : 1)
+                .frame(height: message.content.isEmpty && !message.isStreaming ? 0 : nil)
 
                 if message.role == .assistant { Spacer(minLength: 60) }
             }
@@ -79,5 +101,23 @@ struct MessageBubble: View {
                 : Theme.border,
             lineWidth: 1
         )
+    }
+}
+
+// MARK: - Streaming Cursor
+
+private struct StreamingCursor: View {
+    @State private var visible = true
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1)
+            .fill(Theme.accent)
+            .frame(width: 2, height: 16)
+            .opacity(visible ? 1 : 0)
+            .animation(
+                .easeInOut(duration: 0.5).repeatForever(autoreverses: true),
+                value: visible
+            )
+            .onAppear { visible = false }
     }
 }

@@ -4,8 +4,14 @@ import os
 
 private let log = Logger(subsystem: "com.claudio.app", category: "VoiceService")
 
+/// Closure that sends messages to the server and returns the assistant response
+typealias VoiceSendHandler = (_ messages: [[String: String]]) async throws -> String
+
+/// Closure that plays TTS for a given text
+typealias VoiceTTSHandler = (_ text: String) async -> Void
+
 @Observable
-final class VoiceService: NSObject, AVAudioPlayerDelegate {
+final class VoiceService {
 
     // MARK: - State
 
@@ -25,29 +31,30 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate {
     // MARK: - Private
 
     private var speechRecognizer: SpeechRecognizer?
-    private var audioPlayer: AVAudioPlayer?
     private var observationTask: Task<Void, Never>?
     private var sendTask: Task<Void, Never>?
 
-    // Context needed for API calls
-    private var serverURL = ""
-    private var token = ""
+    // Delegation closures (set by ChatView on start)
+    private var sendHandler: VoiceSendHandler?
+    private var ttsHandler: VoiceTTSHandler?
     private var agentId = ""
     private var chatHistory: [[String: String]] = []
-
-    override init() {
-        super.init()
-    }
 
     // MARK: - Public API
 
     @MainActor
-    func start(serverURL: String, token: String, agentId: String, chatHistory: [[String: String]], speechRecognizer: SpeechRecognizer) {
-        self.serverURL = serverURL
-        self.token = token
+    func start(
+        agentId: String,
+        chatHistory: [[String: String]],
+        speechRecognizer: SpeechRecognizer,
+        sendHandler: @escaping VoiceSendHandler,
+        ttsHandler: @escaping VoiceTTSHandler
+    ) {
         self.agentId = agentId
         self.chatHistory = chatHistory
         self.speechRecognizer = speechRecognizer
+        self.sendHandler = sendHandler
+        self.ttsHandler = ttsHandler
 
         startListening()
     }
@@ -58,12 +65,12 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate {
         sendTask = nil
         observationTask?.cancel()
         observationTask = nil
-        audioPlayer?.stop()
-        audioPlayer = nil
         if let sr = speechRecognizer, sr.isListening {
             _ = sr.stopListening()
         }
         speechRecognizer = nil
+        sendHandler = nil
+        ttsHandler = nil
         liveText = ""
         audioLevel = 0
         state = .idle
@@ -144,45 +151,13 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate {
 
     @MainActor
     private func performSendAndSpeak(messages: [[String: String]]) async {
-        guard let chatURL = URL(string: "\(serverURL)/api/chat/agent/") else {
-            state = .error("Invalid server URL.")
+        guard let sendHandler else {
+            state = .error("Not connected.")
             return
         }
-
-        var chatRequest = URLRequest(url: chatURL)
-        chatRequest.httpMethod = "POST"
-        chatRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !token.isEmpty {
-            chatRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        var body: [String: Any] = ["messages": messages]
-        if !agentId.isEmpty {
-            body["agent"] = agentId
-        }
-
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            state = .error("Failed to encode request.")
-            return
-        }
-        chatRequest.httpBody = httpBody
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: chatRequest)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                log.error("Chat request failed")
-                state = .error("Server error.")
-                return
-            }
-
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let message = choices.first?["message"] as? [String: Any],
-                  let content = message["content"] as? String else {
-                state = .error("Unexpected response.")
-                return
-            }
+            let content = try await sendHandler(messages)
 
             guard !Task.isCancelled else { return }
 
@@ -191,7 +166,9 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate {
 
             // TTS
             state = .speaking
-            await playTTS(for: content)
+            if let ttsHandler {
+                await ttsHandler(content)
+            }
 
             guard !Task.isCancelled else { return }
 
@@ -204,53 +181,6 @@ final class VoiceService: NSObject, AVAudioPlayerDelegate {
         } catch {
             log.error("Voice send error: \(error)")
             state = .error("Connection error.")
-        }
-    }
-
-    @MainActor
-    private func playTTS(for text: String) async {
-        guard let ttsURL = URL(string: "\(serverURL)/api/tts/") else { return }
-
-        var request = URLRequest(url: ttsURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let body: [String: String] = ["text": text, "agent": agentId]
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return }
-        request.httpBody = httpBody
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode),
-                  !data.isEmpty else { return }
-
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-
-            audioPlayer = try AVAudioPlayer(data: data)
-            audioPlayer?.delegate = self
-
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                self.ttsCompletion = { continuation.resume() }
-                self.audioPlayer?.play()
-            }
-        } catch {
-            log.error("TTS error: \(error)")
-        }
-    }
-
-    private var ttsCompletion: (() -> Void)?
-
-    // MARK: - AVAudioPlayerDelegate
-
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        DispatchQueue.main.async { [weak self] in
-            self?.ttsCompletion?()
-            self?.ttsCompletion = nil
         }
     }
 }

@@ -4,7 +4,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let chatService: ChatService
 
-    @State private var isFetching = false
     @State private var editingIndex: Int?
     @State private var editURL = ""
     @State private var editToken = ""
@@ -66,10 +65,8 @@ struct SettingsView: View {
 
                                         Spacer()
 
-                                        if isActive && isFetching {
-                                            ProgressView()
-                                                .scaleEffect(0.7)
-                                                .tint(Theme.accent)
+                                        if isActive {
+                                            ConnectionDot(state: chatService.wsConnectionState)
                                         }
                                     }
                                     .padding(14)
@@ -349,17 +346,11 @@ struct SettingsView: View {
                     isNew: index == -1,
                     url: $editURL,
                     token: $editToken,
-                    isFetching: $isFetching,
                     onSave: {
                         if index == -1 {
                             chatService.addServer(url: editURL, token: editToken)
                         } else {
                             chatService.updateServer(at: index, url: editURL, token: editToken)
-                        }
-                        isFetching = true
-                        Task {
-                            await chatService.fetchAgents()
-                            isFetching = false
                         }
                         editingIndex = nil
                     },
@@ -368,12 +359,8 @@ struct SettingsView: View {
             }
         }
         .onAppear {
-            if chatService.hasServer && chatService.agents.isEmpty {
-                isFetching = true
-                Task {
-                    await chatService.fetchAgents()
-                    isFetching = false
-                }
+            if chatService.hasServer && !chatService.isConnected {
+                chatService.connectWebSocket()
             }
         }
         .alert("Are you sure?", isPresented: $showDangerousConfirm) {
@@ -450,7 +437,6 @@ private struct ServerEditSheet: View {
     let isNew: Bool
     @Binding var url: String
     @Binding var token: String
-    @Binding var isFetching: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -523,5 +509,37 @@ private struct ServerEditSheet: View {
             .foregroundStyle(Theme.textPrimary)
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Connection Status Dot
+
+private struct ConnectionDot: View {
+    let state: WebSocketClient.ConnectionState
+
+    var body: some View {
+        switch state {
+        case .connected:
+            Circle()
+                .fill(Theme.green)
+                .frame(width: 8, height: 8)
+                .shadow(color: Theme.green.opacity(0.5), radius: 3)
+        case .connecting:
+            ProgressView()
+                .scaleEffect(0.7)
+                .tint(Theme.accent)
+        case .pairingRequired:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.accent)
+        case .error:
+            Circle()
+                .fill(Theme.danger)
+                .frame(width: 8, height: 8)
+        case .disconnected:
+            Circle()
+                .fill(Theme.textSecondary.opacity(0.3))
+                .frame(width: 8, height: 8)
+        }
     }
 }

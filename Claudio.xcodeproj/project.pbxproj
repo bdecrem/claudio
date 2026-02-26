@@ -23,8 +23,12 @@
 		A1000001000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000F /* Assets.xcassets */; };
 		B10000010000000000000002 /* VoiceSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000002 /* VoiceSessionView.swift */; };
 		B10000010000000000000004 /* VoiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000003 /* VoiceService.swift */; };
-		D10000010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D10000010000000000000002 /* PrivacyInfo.xcprivacy */; };
 		C10000010000000000000001 /* ChaosService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* ChaosService.swift */; };
+		D10000010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D10000010000000000000002 /* PrivacyInfo.xcprivacy */; };
+		E10000010000000000000001 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000001 /* DeviceIdentity.swift */; };
+		E10000010000000000000002 /* RPCTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000002 /* RPCTypes.swift */; };
+		E10000010000000000000003 /* WebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000003 /* WebSocketClient.swift */; };
+		F10000010000000000000001 /* ToolCallCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000001 /* ToolCallCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,10 +48,14 @@
 		A2000001000000000000000E /* LaunchScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
 		A2000001000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A30000010000000000000001 /* Claudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Claudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B20000010000000000000003 /* VoiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000002 /* VoiceSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSessionView.swift; sourceTree = "<group>"; };
-		D10000010000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B20000010000000000000003 /* VoiceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceService.swift; sourceTree = "<group>"; };
 		C20000010000000000000001 /* ChaosService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaosService.swift; sourceTree = "<group>"; };
+		D10000010000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		E20000010000000000000001 /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
+		E20000010000000000000002 /* RPCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypes.swift; sourceTree = "<group>"; };
+		E20000010000000000000003 /* WebSocketClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
+		F20000010000000000000001 /* ToolCallCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +97,7 @@
 			children = (
 				A20000010000000000000002 /* Message.swift */,
 				A20000010000000000000003 /* ChatService.swift */,
+				E20000010000000000000002 /* RPCTypes.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -104,6 +113,7 @@
 				A20000010000000000000009 /* SettingsView.swift */,
 				A2000001000000000000000E /* LaunchScreen.swift */,
 				B20000010000000000000002 /* VoiceSessionView.swift */,
+				F20000010000000000000001 /* ToolCallCard.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -115,6 +125,8 @@
 				A2000001000000000000000B /* HapticsManager.swift */,
 				B20000010000000000000003 /* VoiceService.swift */,
 				C20000010000000000000001 /* ChaosService.swift */,
+				E20000010000000000000001 /* DeviceIdentity.swift */,
+				E20000010000000000000003 /* WebSocketClient.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -225,6 +237,10 @@
 				B10000010000000000000004 /* VoiceService.swift in Sources */,
 				B10000010000000000000002 /* VoiceSessionView.swift in Sources */,
 				C10000010000000000000001 /* ChaosService.swift in Sources */,
+				E10000010000000000000001 /* DeviceIdentity.swift in Sources */,
+				E10000010000000000000002 /* RPCTypes.swift in Sources */,
+				E10000010000000000000003 /* WebSocketClient.swift in Sources */,
+				F10000010000000000000001 /* ToolCallCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -362,7 +378,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = A60000010000000000000002 /* Project object */;
 }

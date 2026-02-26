@@ -1,5 +1,7 @@
 # Claudio
 
+USE THE XCODE CLI - DO NOT BE LAZY!!!!
+
 Native iPhone client for OpenClaw — a self-hosted AI agent backend. The app is purely a client: the backend handles all AI logic, tool calls, memory, and TTS proxying. Users configure one server URL and go.
 
 ## Architecture

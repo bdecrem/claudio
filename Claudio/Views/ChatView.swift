@@ -59,11 +59,11 @@ struct ChatView: View {
 
                                 HStack(spacing: 5) {
                                     Circle()
-                                        .fill(Theme.green)
+                                        .fill(connectionStatusColor)
                                         .frame(width: 6, height: 6)
-                                        .shadow(color: Theme.green.opacity(0.6), radius: 3)
+                                        .shadow(color: connectionStatusColor.opacity(0.6), radius: 3)
                                         .modifier(PulseOpacity())
-                                    Text("online")
+                                    Text(connectionStatusText)
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(Theme.textSecondary)
                                 }
@@ -135,7 +135,7 @@ struct ChatView: View {
                                     .padding(.vertical, 16)
                                 }
 
-                                if chatService.isLoading {
+                                if chatService.isLoading && !hasStreamingMessage {
                                     // Agent label above thinking bubble
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
@@ -189,8 +189,11 @@ struct ChatView: View {
                             .onChange(of: chatService.messages.count) {
                                 scrollToBottom(proxy: proxy)
                             }
+                            .onChange(of: streamingContent) {
+                                scrollToBottom(proxy: proxy)
+                            }
                             .onChange(of: chatService.isLoading) {
-                                if chatService.isLoading {
+                                if chatService.isLoading && !hasStreamingMessage {
                                     withAnimation(.easeOut(duration: 0.2)) {
                                         proxy.scrollTo("loading", anchor: .bottom)
                                     }
@@ -269,7 +272,7 @@ struct ChatView: View {
         .onAppear {
             speechRecognizer.requestAuthorization()
             if chatService.hasServer {
-                Task { await chatService.fetchAgents() }
+                chatService.connectWebSocket()
             }
             if ChaosService.shared.shouldCheckNow {
                 Task {
@@ -283,11 +286,38 @@ struct ChatView: View {
         .preferredColorScheme(.dark)
     }
 
+    private var hasStreamingMessage: Bool {
+        chatService.messages.contains { $0.isStreaming }
+    }
+
+    private var streamingContent: String {
+        chatService.messages.last(where: { $0.isStreaming })?.content ?? ""
+    }
+
     private var currentAgentName: String {
         if let agent = chatService.agents.first(where: { $0.id == chatService.selectedAgent }) {
             return agent.name
         }
         return chatService.selectedAgent.isEmpty ? "Claudio" : chatService.selectedAgent
+    }
+
+    private var connectionStatusColor: Color {
+        switch chatService.wsConnectionState {
+        case .connected: return Theme.green
+        case .connecting: return Theme.accent
+        case .error, .pairingRequired: return Theme.danger
+        case .disconnected: return Theme.textSecondary
+        }
+    }
+
+    private var connectionStatusText: String {
+        switch chatService.wsConnectionState {
+        case .connected: return "online"
+        case .connecting: return "connecting"
+        case .error: return "error"
+        case .pairingRequired: return "pairing needed"
+        case .disconnected: return "offline"
+        }
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
@@ -315,12 +345,24 @@ struct ChatView: View {
 
         showVoiceSession = true
 
+        let agentId = chatService.selectedAgentId
+        let chatHistory = chatService.messages.map { $0.apiRepresentation }
+
         voiceService.start(
-            serverURL: server.url,
-            token: server.token,
-            agentId: chatService.selectedAgentId,
-            chatHistory: chatService.messages.map { $0.apiRepresentation },
-            speechRecognizer: speechRecognizer
+            agentId: agentId,
+            chatHistory: chatHistory,
+            speechRecognizer: speechRecognizer,
+            sendHandler: { [chatService] messages async throws -> String in
+                try await chatService.sendForVoice(
+                    serverURL: server.url,
+                    token: server.token,
+                    agentId: agentId,
+                    messages: messages
+                )
+            },
+            ttsHandler: { [chatService] text async in
+                await chatService.playTTSPublic(for: text, agentId: agentId, server: server)
+            }
         )
     }
 

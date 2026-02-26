@@ -12,11 +12,18 @@ final class ChatService {
     var agents: [Agent] = []
     var agentFetchFailed = false
     var connectionError: String?
+    var wsConnectionState: WebSocketClient.ConnectionState = .disconnected
 
     // Per-agent chat history
     private var chatHistories: [String: [Message]] = [:]
     private var audioPlayer: AVAudioPlayer?
     private var pendingAgents: Set<String> = []
+    private let webSocketClient = WebSocketClient()
+
+    // Streaming message tracking
+    private var streamingMessageId: UUID?
+    private var pendingVoiceTTS: Bool = false
+    private var voiceContinuation: CheckedContinuation<String, Error>?
 
     // MARK: - Server config
 
@@ -60,6 +67,10 @@ final class ChatService {
         pendingAgents.contains(selectedAgent)
     }
 
+    var isConnected: Bool {
+        wsConnectionState == .connected
+    }
+
     init() {
         self.selectedAgent = UserDefaults.standard.string(forKey: "selectedAgent") ?? ""
         self.activeServerIndex = UserDefaults.standard.integer(forKey: "activeServerIndex")
@@ -68,7 +79,8 @@ final class ChatService {
            let decoded = try? JSONDecoder().decode([CodableServer].self, from: data) {
             self.savedServers = decoded.map { server in
                 var url = server.url
-                if !url.hasPrefix("http://") && !url.hasPrefix("https://") {
+                if !url.hasPrefix("http://") && !url.hasPrefix("https://") &&
+                   !url.hasPrefix("ws://") && !url.hasPrefix("wss://") {
                     url = "https://\(url)"
                 }
                 return Server(url: url, token: server.token)
@@ -90,41 +102,38 @@ final class ChatService {
         let serverIndex: Int    // which server this agent belongs to
     }
 
-    private struct DecodedAgent: Decodable {
-        let id: String
-        let name: String
-        let emoji: String?
-        let color: String?
-    }
-
     // MARK: - Server management
 
     func addServer(url: String, token: String) {
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
         guard !cleaned.isEmpty else { return }
-        if !cleaned.hasPrefix("http://") && !cleaned.hasPrefix("https://") {
+        if !cleaned.hasPrefix("http://") && !cleaned.hasPrefix("https://") &&
+           !cleaned.hasPrefix("ws://") && !cleaned.hasPrefix("wss://") {
             cleaned = "https://\(cleaned)"
         }
         savedServers.append(Server(url: cleaned, token: token))
         if savedServers.count == 1 {
             activeServerIndex = 0
         }
-        Task { await fetchAgents() }
+        connectWebSocket()
     }
 
     func updateServer(at index: Int, url: String, token: String) {
         guard savedServers.indices.contains(index) else { return }
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
-        if !cleaned.hasPrefix("http://") && !cleaned.hasPrefix("https://") {
+        if !cleaned.hasPrefix("http://") && !cleaned.hasPrefix("https://") &&
+           !cleaned.hasPrefix("ws://") && !cleaned.hasPrefix("wss://") {
             cleaned = "https://\(cleaned)"
         }
         savedServers[index] = Server(
             url: cleaned,
             token: token
         )
-        Task { await fetchAgents() }
+        if index == activeServerIndex {
+            connectWebSocket()
+        }
     }
 
     func removeServer(at index: Int) {
@@ -133,23 +142,12 @@ final class ChatService {
         if activeServerIndex >= savedServers.count {
             activeServerIndex = max(0, savedServers.count - 1)
         }
-        // Re-fetch since server indices shifted
-        Task { await fetchAgents() }
     }
 
     func switchServer(to index: Int) {
         guard savedServers.indices.contains(index), index != activeServerIndex else { return }
         activeServerIndex = index
-    }
-
-    // MARK: - Auth helper
-
-    private func authorizedRequest(url: URL, server: Server) -> URLRequest {
-        var request = URLRequest(url: url)
-        if !server.token.isEmpty {
-            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
-        }
-        return request
+        connectWebSocket()
     }
 
     /// Find the server for a given agent
@@ -171,79 +169,267 @@ final class ChatService {
         agents.first(where: { $0.id == selectedAgent })?.agentId ?? selectedAgent
     }
 
-    // MARK: - Agents
+    /// Session key for current agent (format: "agent:{agentId}:main")
+    var currentSessionKey: String {
+        "agent:\(selectedAgentId):main"
+    }
 
-    @MainActor
-    func fetchAgents() async {
-        guard !savedServers.isEmpty else {
-            log.error("fetchAgents: no servers configured")
-            agentFetchFailed = true
+    // MARK: - WebSocket Connection
+
+    private var callbacksReady = false
+
+    func connectWebSocket() {
+        guard let server = activeServer else {
+            log.error("connectWebSocket: no active server")
             return
         }
 
-        var allAgents: [Agent] = []
-        var anySuccess = false
+        log.info("connectWebSocket: \(server.url)")
+        Task {
+            if !callbacksReady {
+                await setupWebSocketCallbacks()
+                callbacksReady = true
+            }
+            await webSocketClient.connect(serverURL: server.url, token: server.token)
+        }
+    }
 
-        for (index, server) in savedServers.enumerated() {
-            guard let url = URL(string: "\(server.url)/api/agents") else {
-                log.error("fetchAgents: invalid URL from '\(server.url)'")
-                continue
+    func disconnectWebSocket() {
+        Task { await webSocketClient.disconnect() }
+    }
+
+    private func setupWebSocketCallbacks() async {
+        await webSocketClient.setCallbacks(
+            onStateChange: { [weak self] state in
+                guard let self else { return }
+                self.wsConnectionState = state
+                log.info("WS state: \(String(describing: state))")
+
+                switch state {
+                case .connected:
+                    self.connectionError = nil
+                    Task { await self.onWebSocketConnected() }
+
+                case .pairingRequired:
+                    self.connectionError = "Device pairing required. Approve this device on your server."
+                    self.agentFetchFailed = true
+
+                case .error(let msg):
+                    self.connectionError = msg
+
+                case .disconnected:
+                    break
+
+                case .connecting:
+                    break
+                }
+            },
+            onChatEvent: { [weak self] event in
+                guard let self else { return }
+                self.handleChatEvent(event)
+            },
+            onAgentEvent: { [weak self] event in
+                guard let self else { return }
+                self.handleAgentEvent(event)
+            }
+        )
+    }
+
+    @MainActor
+    private func onWebSocketConnected() async {
+        // Fetch agents via WebSocket
+        await fetchAgentsViaWS()
+
+        // Load chat history
+        await loadChatHistory()
+    }
+
+    @MainActor
+    private func fetchAgentsViaWS() async {
+        do {
+            let wsAgents = try await webSocketClient.agentsList()
+            log.info("fetchAgentsViaWS: got \(wsAgents.count) agents")
+
+            var allAgents: [Agent] = []
+            for a in wsAgents {
+                allAgents.append(Agent(
+                    id: "\(activeServerIndex):\(a.id)",
+                    agentId: a.id,
+                    name: a.name,
+                    emoji: a.emoji,
+                    color: a.color,
+                    serverIndex: activeServerIndex
+                ))
             }
 
-            log.info("fetchAgents: GET \(url)")
-            let request = authorizedRequest(url: url, server: server)
+            agents = allAgents
+            agentFetchFailed = false
+            connectionError = nil
 
-            do {
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    log.error("fetchAgents: not an HTTP response from \(server.url)")
-                    continue
-                }
+            if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
+                selectedAgent = agents.first?.id ?? ""
+                log.info("fetchAgentsViaWS: selected '\(self.selectedAgent)'")
+            }
+        } catch {
+            log.error("fetchAgentsViaWS: \(error)")
+            agentFetchFailed = true
+        }
+    }
 
-                log.info("fetchAgents: \(server.url) status \(httpResponse.statusCode)")
+    @MainActor
+    private func loadChatHistory() async {
+        do {
+            let historyMessages = try await webSocketClient.chatHistory(sessionKey: currentSessionKey, limit: 50)
+            log.info("loadChatHistory: got \(historyMessages.count) messages")
 
-                if httpResponse.statusCode == 401 {
-                    connectionError = "Authentication required for \(server.url)."
-                    continue
-                }
-                if httpResponse.statusCode == 403 {
-                    connectionError = "Invalid token for \(server.url)."
-                    continue
-                }
-                guard (200...299).contains(httpResponse.statusCode) else {
-                    continue
-                }
+            guard !historyMessages.isEmpty else { return }
 
-                struct AgentsResponse: Decodable {
-                    let agents: [DecodedAgent]
+            // Only load if we don't already have messages (don't overwrite active session)
+            if messages.isEmpty {
+                messages = historyMessages.map { msg in
+                    let role: Message.Role = msg.role == "user" ? .user : .assistant
+                    return Message(
+                        role: role,
+                        content: msg.content,
+                        timestamp: msg.timestamp ?? Date()
+                    )
                 }
+                persistChatHistories()
+            }
+        } catch {
+            log.error("loadChatHistory: \(error)")
+        }
+    }
 
-                let decoded = try JSONDecoder().decode(AgentsResponse.self, from: data)
-                log.info("fetchAgents: \(server.url) returned \(decoded.agents.count) agents")
+    // MARK: - Chat Events
 
-                for a in decoded.agents {
-                    allAgents.append(Agent(
-                        id: "\(index):\(a.id)",
-                        agentId: a.id,
-                        name: a.name,
-                        emoji: a.emoji,
-                        color: a.color,
-                        serverIndex: index
-                    ))
+    @MainActor
+    private func handleChatEvent(_ event: ChatEvent) {
+        switch event.state {
+        case .delta:
+            guard let text = event.text else { return }
+
+            if let msgId = streamingMessageId,
+               let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                // Update existing streaming message — delta contains FULL text so far
+                messages[idx].content = text
+            } else {
+                // First delta — create streaming placeholder
+                let placeholder = Message(role: .assistant, content: text, isStreaming: true)
+                messages.append(placeholder)
+                streamingMessageId = placeholder.id
+            }
+
+        case .final_:
+            let finalText = event.text ?? ""
+
+            if let msgId = streamingMessageId,
+               let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                messages[idx].content = finalText
+                messages[idx].isStreaming = false
+            } else {
+                // Got final without any deltas
+                messages.append(Message(role: .assistant, content: finalText))
+            }
+
+            let compositeId = selectedAgent
+            pendingAgents.remove(compositeId)
+            isLoading = isLoadingCurrentAgent
+            streamingMessageId = nil
+            persistChatHistories()
+
+            // Handle voice continuation
+            if let continuation = voiceContinuation {
+                voiceContinuation = nil
+                pendingVoiceTTS = false
+                continuation.resume(returning: finalText)
+            }
+
+            // Handle inline voice TTS
+            if pendingVoiceTTS, !finalText.isEmpty {
+                pendingVoiceTTS = false
+                let agentId = selectedAgentId
+                if let server = selectedServer {
+                    Task { await playTTS(for: finalText, agentId: agentId, server: server) }
                 }
-                anySuccess = true
-            } catch {
-                log.error("fetchAgents: \(server.url) error — \(error)")
+            }
+
+        case .aborted:
+            if let msgId = streamingMessageId,
+               let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                if let text = event.text, !text.isEmpty {
+                    messages[idx].content = text
+                }
+                messages[idx].isStreaming = false
+            }
+
+            let compositeId = selectedAgent
+            pendingAgents.remove(compositeId)
+            isLoading = isLoadingCurrentAgent
+            streamingMessageId = nil
+            persistChatHistories()
+
+            if let continuation = voiceContinuation {
+                voiceContinuation = nil
+                pendingVoiceTTS = false
+                continuation.resume(returning: event.text ?? "")
+            }
+
+        case .error:
+            let errorMsg = event.errorMessage ?? "Something went wrong."
+
+            if let msgId = streamingMessageId,
+               let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                messages[idx].content = errorMsg
+                messages[idx].isStreaming = false
+            }
+
+            connectionError = errorMsg
+            let compositeId = selectedAgent
+            pendingAgents.remove(compositeId)
+            isLoading = isLoadingCurrentAgent
+            streamingMessageId = nil
+            persistChatHistories()
+
+            if let continuation = voiceContinuation {
+                voiceContinuation = nil
+                pendingVoiceTTS = false
+                continuation.resume(throwing: WebSocketError.serverError(errorMsg))
             }
         }
+    }
 
-        agents = allAgents
-        agentFetchFailed = !anySuccess
-        if anySuccess { connectionError = nil }
+    // MARK: - Agent Events (Tool Calls)
 
-        if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
-            selectedAgent = agents.first?.id ?? ""
-            log.info("fetchAgents: selected '\(self.selectedAgent)'")
+    @MainActor
+    private func handleAgentEvent(_ event: AgentEvent) {
+        switch event.kind {
+        case .toolUse:
+            let toolCall = ToolCall(
+                id: event.callId,
+                name: event.toolName ?? "tool",
+                args: event.args ?? [:]
+            )
+
+            // Attach to the current streaming message, or create one
+            if let msgId = streamingMessageId,
+               let idx = messages.firstIndex(where: { $0.id == msgId }) {
+                messages[idx].toolCalls.append(toolCall)
+            } else {
+                // Create a streaming placeholder with the tool call
+                var placeholder = Message(role: .assistant, content: "", isStreaming: true)
+                placeholder.toolCalls.append(toolCall)
+                messages.append(placeholder)
+                streamingMessageId = placeholder.id
+            }
+
+        case .toolResult:
+            // Find the tool call by callId and set its output
+            if let msgId = streamingMessageId,
+               let msgIdx = messages.firstIndex(where: { $0.id == msgId }),
+               let tcIdx = messages[msgIdx].toolCalls.firstIndex(where: { $0.id == event.callId }) {
+                messages[msgIdx].toolCalls[tcIdx].output = event.output ?? ""
+            }
         }
     }
 
@@ -256,135 +442,79 @@ final class ChatService {
         persistChatHistories()
 
         let compositeId = selectedAgent
-        let rawAgentId = selectedAgentId
-        let server = selectedServer
-        let history = messages.map { $0.apiRepresentation }
-
-        log.info("sendMessage: agent='\(rawAgentId)' server='\(server?.url ?? "nil")' messages=\(history.count)")
-
+        let sessionKey = currentSessionKey
         pendingAgents.insert(compositeId)
         isLoading = isLoadingCurrentAgent
+        pendingVoiceTTS = playVoice
+
+        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) playVoice=\(playVoice)")
 
         Task {
-            await fetchResponse(compositeId: compositeId, agentId: rawAgentId, server: server, history: history, playVoice: playVoice)
+            do {
+                _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content)
+            } catch {
+                log.error("sendMessage failed: \(error)")
+                await MainActor.run {
+                    self.connectionError = error.localizedDescription
+                    self.pendingAgents.remove(compositeId)
+                    self.isLoading = self.isLoadingCurrentAgent
+                    self.pendingVoiceTTS = false
+                }
+            }
         }
     }
 
-    @MainActor
-    private func fetchResponse(
-        compositeId: String,
+    /// Send a message and collect the full response (for voice mode)
+    func sendForVoice(
+        serverURL: String,
+        token: String,
         agentId: String,
-        server: Server?,
-        history: [[String: String]],
-        playVoice: Bool
-    ) async {
-        guard let server else {
-            log.error("fetchResponse: no server")
-            deliverResult(.failure("No server configured."), to: compositeId)
-            return
-        }
-        guard let url = URL(string: "\(server.url)/api/chat/agent") else {
-            log.error("fetchResponse: invalid URL from '\(server.url)'")
-            deliverResult(.failure("Invalid server address."), to: compositeId)
-            return
-        }
-        log.info("fetchResponse: POST \(url) agent='\(agentId)'")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !server.token.isEmpty {
-            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
+        messages: [[String: String]]
+    ) async throws -> String {
+        // Extract the last user message
+        guard let lastMessage = messages.last, let content = lastMessage["content"] else {
+            throw WebSocketError.serverError("No message to send")
         }
 
-        var body: [String: Any] = ["messages": history]
-        if !agentId.isEmpty {
-            body["agent"] = agentId
-        }
-
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
-            deliverResult(.failure("Failed to encode request."), to: compositeId)
-            return
-        }
-        request.httpBody = httpBody
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                deliverResult(.failure("Invalid response."), to: compositeId)
-                return
-            }
-
-            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                deliverResult(.failure("Authentication failed. Check your token."), to: compositeId)
-                return
-            }
-
-            guard (200...299).contains(httpResponse.statusCode) else {
-                deliverResult(.failure("Server error (\(httpResponse.statusCode))."), to: compositeId)
-                return
-            }
-
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let message = choices.first?["message"] as? [String: Any],
-                  let content = message["content"] as? String else {
-                deliverResult(.failure("Unexpected response format."), to: compositeId)
-                return
-            }
-
-            deliverResult(.success(content), to: compositeId)
-
-            if playVoice {
-                await playTTS(for: content, agentId: agentId, server: server)
-            }
-        } catch let urlError as URLError {
-            log.error("fetchResponse: URLError \(urlError.code.rawValue) — \(urlError.localizedDescription)")
-            deliverResult(.failure("Can't connect to server."), to: compositeId)
-        } catch {
-            log.error("fetchResponse: error — \(error)")
-            deliverResult(.failure("Connection error."), to: compositeId)
-        }
-    }
-
-    private enum DeliveryResult {
-        case success(String)
-        case failure(String)
-    }
-
-    @MainActor
-    private func deliverResult(_ result: DeliveryResult, to agentId: String) {
-        pendingAgents.remove(agentId)
-
-        let responseMessage: Message
-        switch result {
-        case .success(let content):
-            responseMessage = Message(role: .assistant, content: content)
-        case .failure(let error):
-            responseMessage = Message(role: .assistant, content: error)
-            if agentId == selectedAgent {
-                connectionError = error
+        return try await withCheckedThrowingContinuation { continuation in
+            Task { @MainActor in
+                self.voiceContinuation = continuation
+                // Send via WebSocket — response comes back via chat event
+                Task {
+                    do {
+                        _ = try await self.webSocketClient.chatSend(sessionKey: self.currentSessionKey, message: content)
+                    } catch {
+                        if let cont = self.voiceContinuation {
+                            self.voiceContinuation = nil
+                            cont.resume(throwing: error)
+                        }
+                    }
+                }
             }
         }
-
-        if agentId == selectedAgent {
-            messages.append(responseMessage)
-        } else {
-            var history = chatHistories[agentId] ?? []
-            history.append(responseMessage)
-            chatHistories[agentId] = history
-        }
-
-        isLoading = isLoadingCurrentAgent
-        persistChatHistories()
     }
 
     // MARK: - TTS
 
     @MainActor
+    func playTTSPublic(for text: String, agentId: String, server: Server) async {
+        await playTTS(for: text, agentId: agentId, server: server)
+    }
+
+    /// Convert ws:// or wss:// URLs to http:// or https:// for HTTP endpoints (TTS)
+    private func httpURL(for serverURL: String) -> String {
+        if serverURL.hasPrefix("wss://") {
+            return "https://" + serverURL.dropFirst("wss://".count)
+        } else if serverURL.hasPrefix("ws://") {
+            return "http://" + serverURL.dropFirst("ws://".count)
+        }
+        return serverURL
+    }
+
+    @MainActor
     private func playTTS(for text: String, agentId: String, server: Server) async {
-        guard let url = URL(string: "\(server.url)/api/tts") else { return }
+        let baseURL = httpURL(for: server.url)
+        guard let url = URL(string: "\(baseURL)/api/tts") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
