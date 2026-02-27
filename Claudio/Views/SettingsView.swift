@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let chatService: ChatService
+    var roomService: RoomService?
 
     @State private var editingIndex: Int?
     @State private var editURL = ""
@@ -153,6 +154,11 @@ struct SettingsView: View {
 
                     // MARK: - Notifications
                     NotificationSettingsSection(cardRadius: cardRadius)
+
+                    // MARK: - Claudio Backend (Rooms)
+                    if let roomService {
+                        ClaudioBackendSection(roomService: roomService, cardRadius: cardRadius)
+                    }
 
                     if chatService.agentFetchFailed {
                         SettingsSection(title: "Agent") {
@@ -635,6 +641,131 @@ private struct NotificationSettingsSection: View {
     private func openAppSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
+        }
+    }
+}
+
+// MARK: - Claudio Backend Section
+
+private struct ClaudioBackendSection: View {
+    let roomService: RoomService
+    let cardRadius: CGFloat
+
+    @State private var url: String = ""
+    @State private var token: String = ""
+    @State private var displayName: String = ""
+    @State private var avatarEmoji: String = ""
+
+    var body: some View {
+        SettingsSection(title: "Claudio Backend") {
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: Theme.spacing) {
+                    Text("Server URL")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    ZStack(alignment: .leading) {
+                        if url.isEmpty {
+                            Text("claudio-server.example.com")
+                                .font(.system(size: 15))
+                                .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                        }
+                        TextField("", text: $url)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.textPrimary)
+                            .tint(Theme.accent)
+                            .keyboardType(.URL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .onChange(of: url) { _, newValue in
+                                roomService.backendURL = newValue
+                            }
+                    }
+                }
+                .padding(14)
+
+                Divider().background(Theme.border)
+
+                VStack(alignment: .leading, spacing: Theme.spacing) {
+                    Text("Token (optional)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    SecureField("Bearer token", text: $token)
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.textPrimary)
+                        .tint(Theme.accent)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: token) { _, newValue in
+                            roomService.backendToken = newValue
+                        }
+                }
+                .padding(14)
+
+                Divider().background(Theme.border)
+
+                VStack(alignment: .leading, spacing: Theme.spacing) {
+                    Text("Display Name")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    TextField("", text: $displayName, prompt:
+                        Text("Your name in rooms")
+                            .foregroundStyle(Theme.textDim)
+                    )
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.textPrimary)
+                    .tint(Theme.accent)
+                    .autocorrectionDisabled()
+                    .onChange(of: displayName) { _, newValue in
+                        roomService.displayName = newValue
+                    }
+                }
+                .padding(14)
+
+                Divider().background(Theme.border)
+
+                VStack(alignment: .leading, spacing: Theme.spacing) {
+                    Text("Avatar Emoji")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                    TextField("", text: $avatarEmoji, prompt:
+                        Text("e.g. 😎")
+                            .foregroundStyle(Theme.textDim)
+                    )
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.textPrimary)
+                    .onChange(of: avatarEmoji) { _, newValue in
+                        roomService.avatarEmoji = newValue
+                    }
+                }
+                .padding(14)
+            }
+            .background(Theme.surface)
+            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+
+            if roomService.hasBackend {
+                Button {
+                    if roomService.isConnected {
+                        Task { await roomService.updateProfile() }
+                    } else {
+                        roomService.connect()
+                    }
+                } label: {
+                    Text(roomService.isConnected ? "Update Profile" : "Connect")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+        }
+        .onAppear {
+            url = roomService.backendURL
+            token = roomService.backendToken
+            displayName = roomService.displayName
+            avatarEmoji = roomService.avatarEmoji
         }
     }
 }

@@ -16,13 +16,20 @@ struct Message: Identifiable, Equatable {
     var toolCalls: [ToolCall]
     var imageAttachments: [ImageAttachment]
 
+    // Room message identity (nil for 1-on-1 chats)
+    var senderId: String?
+    var senderDisplayName: String?
+    var senderEmoji: String?
+    var mentions: [String]?
+    var replyToId: String?
+
     enum Role: String, Codable {
         case user
         case assistant
         case system
     }
 
-    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = [], imageAttachments: [ImageAttachment] = []) {
+    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = [], imageAttachments: [ImageAttachment] = [], senderId: String? = nil, senderDisplayName: String? = nil, senderEmoji: String? = nil, mentions: [String]? = nil, replyToId: String? = nil) {
         self.id = id
         self.role = role
         self.content = content
@@ -30,6 +37,11 @@ struct Message: Identifiable, Equatable {
         self.isStreaming = isStreaming
         self.toolCalls = toolCalls
         self.imageAttachments = imageAttachments
+        self.senderId = senderId
+        self.senderDisplayName = senderDisplayName
+        self.senderEmoji = senderEmoji
+        self.mentions = mentions
+        self.replyToId = replyToId
     }
 
     var apiRepresentation: [String: String] {
@@ -52,6 +64,7 @@ struct ToolCall: Identifiable, Equatable {
 extension Message: Codable {
     enum CodingKeys: String, CodingKey {
         case id, role, content, timestamp
+        case senderId, senderDisplayName, senderEmoji, mentions, replyToId
     }
 
     init(from decoder: Decoder) throws {
@@ -63,6 +76,11 @@ extension Message: Codable {
         isStreaming = false
         toolCalls = []
         imageAttachments = []
+        senderId = try container.decodeIfPresent(String.self, forKey: .senderId)
+        senderDisplayName = try container.decodeIfPresent(String.self, forKey: .senderDisplayName)
+        senderEmoji = try container.decodeIfPresent(String.self, forKey: .senderEmoji)
+        mentions = try container.decodeIfPresent([String].self, forKey: .mentions)
+        replyToId = try container.decodeIfPresent(String.self, forKey: .replyToId)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -71,5 +89,10 @@ extension Message: Codable {
         try container.encode(role, forKey: .role)
         try container.encode(content, forKey: .content)
         try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(senderId, forKey: .senderId)
+        try container.encodeIfPresent(senderDisplayName, forKey: .senderDisplayName)
+        try container.encodeIfPresent(senderEmoji, forKey: .senderEmoji)
+        try container.encodeIfPresent(mentions, forKey: .mentions)
+        try container.encodeIfPresent(replyToId, forKey: .replyToId)
     }
 }
