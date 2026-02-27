@@ -18,6 +18,7 @@ final class ChatService {
     // Per-agent chat history
     private var chatHistories: [String: [Message]] = [:]
     private var audioPlayer: AVAudioPlayer?
+    private var ttsDelegate: TTSDelegate?
     private var pendingAgents: Set<String> = []
     private let webSocketClient = WebSocketClient()
 
@@ -531,9 +532,9 @@ final class ChatService {
         // Convert image attachments to base64 dicts for the wire
         let wireAttachments: [[String: String]] = imageAttachments.map { img in
             [
-                "filename": img.filename,
-                "contentType": img.contentType,
-                "data": img.data.base64EncodedString()
+                "fileName": img.filename,
+                "mimeType": img.contentType,
+                "content": img.data.base64EncodedString()
             ]
         }
 
@@ -627,11 +628,19 @@ final class ChatService {
             try AVAudioSession.sharedInstance().setActive(true)
 
             audioPlayer = try AVAudioPlayer(data: data)
-            audioPlayer?.delegate = TTSDelegate { [weak self] in
-                DispatchQueue.main.async { self?.isSpeaking = false }
+
+            // Wait for playback to finish so callers (e.g. voice mode) don't
+            // immediately start the mic and kill audio output.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let delegate = TTSDelegate { [weak self] in
+                    DispatchQueue.main.async { self?.isSpeaking = false }
+                    continuation.resume()
+                }
+                self.ttsDelegate = delegate
+                audioPlayer?.delegate = delegate
+                isSpeaking = true
+                audioPlayer?.play()
             }
-            isSpeaking = true
-            audioPlayer?.play()
         } catch {
             // TTS is enhancement — fail silently
         }
