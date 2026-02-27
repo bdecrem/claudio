@@ -1,12 +1,16 @@
 package openclaw
 
 import (
+	"os"
 	"testing"
 )
 
 func TestLiveConnect(t *testing.T) {
-	url := "wss://theaf-web.ngrok.io"
-	token := "***REDACTED***"
+	url := os.Getenv("OPENCLAW_URL")
+	token := os.Getenv("OPENCLAW_TOKEN")
+	if url == "" || token == "" {
+		t.Skip("OPENCLAW_URL and OPENCLAW_TOKEN must be set")
+	}
 
 	c := NewClient(url, token)
 	err := c.Connect()
@@ -22,8 +26,11 @@ func TestLiveConnect(t *testing.T) {
 }
 
 func TestLiveChatSend(t *testing.T) {
-	url := "wss://theaf-web.ngrok.io"
-	token := "***REDACTED***"
+	url := os.Getenv("OPENCLAW_URL")
+	token := os.Getenv("OPENCLAW_TOKEN")
+	if url == "" || token == "" {
+		t.Skip("OPENCLAW_URL and OPENCLAW_TOKEN must be set")
+	}
 
 	c := NewClient(url, token)
 	err := c.Connect()
