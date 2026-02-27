@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RoomListView: View {
     let roomService: RoomService
+    let chatService: ChatService
     @State private var showCreateRoom = false
     @State private var showJoinRoom = false
     @State private var selectedRoom: Room?
@@ -26,9 +27,7 @@ struct RoomListView: View {
             JoinRoomSheet(roomService: roomService)
         }
         .fullScreenCover(item: $selectedRoom) { room in
-            RoomChatView(roomService: roomService, room: room, onDismiss: {
-                selectedRoom = nil
-            })
+            RoomChatView(roomService: roomService, chatService: chatService, room: room)
             .preferredColorScheme(.dark)
         }
     }

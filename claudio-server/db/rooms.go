@@ -34,8 +34,9 @@ type Participant struct {
 	IsOnline    bool   `json:"isOnline"`
 	Role        string `json:"role"`
 	// Agent-specific fields
-	AgentID     string `json:"agentId,omitempty"`
-	OpenclawURL string `json:"openclawUrl,omitempty"`
+	AgentID      string `json:"agentId,omitempty"`
+	OpenclawURL  string `json:"openclawUrl,omitempty"`
+	OpenclawToken string `json:"-"` // never sent to clients
 }
 
 func nanoid() string {
@@ -185,7 +186,7 @@ func (db *DB) GetAgentParticipant(roomID, agentID, openclawURL string) (*Partici
 
 func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 	rows, err := db.Query(`
-		SELECT p.user_id, p.agent_id, p.openclaw_url, p.agent_name, p.agent_emoji, p.role,
+		SELECT p.user_id, p.agent_id, p.openclaw_url, p.openclaw_token, p.agent_name, p.agent_emoji, p.role,
 		       COALESCE(u.display_name, ''), COALESCE(u.avatar_emoji, '')
 		FROM participants p
 		LEFT JOIN users u ON u.id = p.user_id
@@ -198,8 +199,8 @@ func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 
 	var participants []Participant
 	for rows.Next() {
-		var userID, agentID, openclawURL, agentName, agentEmoji, role, userName, userEmoji *string
-		if err := rows.Scan(&userID, &agentID, &openclawURL, &agentName, &agentEmoji, &role, &userName, &userEmoji); err != nil {
+		var userID, agentID, openclawURL, openclawToken, agentName, agentEmoji, role, userName, userEmoji *string
+		if err := rows.Scan(&userID, &agentID, &openclawURL, &openclawToken, &agentName, &agentEmoji, &role, &userName, &userEmoji); err != nil {
 			continue
 		}
 
@@ -211,6 +212,7 @@ func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 			p.IsAgent = true
 			p.AgentID = *agentID
 			p.OpenclawURL = deref(openclawURL)
+			p.OpenclawToken = deref(openclawToken)
 		} else if userID != nil {
 			p.ID = *userID
 			p.DisplayName = deref(userName)

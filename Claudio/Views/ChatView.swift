@@ -2,8 +2,8 @@ import SwiftUI
 import PhotosUI
 
 struct ChatView: View {
-    var roomService: RoomService?
     @State private var chatService = ChatService()
+    @State private var roomService = RoomService()
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var voiceService = VoiceService()
     @State private var messageText = ""
@@ -13,6 +13,7 @@ struct ChatView: View {
     @State private var pendingImages: [ImageAttachment] = []
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var showPhotoPicker = false
+    @State private var selectedRoom: Room?
 
     var body: some View {
         ZStack {
@@ -46,7 +47,16 @@ struct ChatView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
+            } else if let room = selectedRoom {
+                // Room chat mode
+                VStack(spacing: 0) {
+                    // Agent/room picker
+                    pickerSection
+
+                    RoomChatView(roomService: roomService, chatService: chatService, room: room)
+                }
             } else {
+                // Agent chat mode
                 VStack(spacing: 0) {
                     // Header
                     VStack(spacing: 0) {
@@ -92,24 +102,8 @@ struct ChatView: View {
                         Theme.border.frame(height: 1)
                     }
 
-                    // Agent switcher pills
-                    if chatService.visibleAgents.count > 1 {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            AgentPicker(
-                                selected: Binding(
-                                    get: { chatService.selectedAgent },
-                                    set: { chatService.selectedAgent = $0 }
-                                ),
-                                agents: chatService.visibleAgents,
-                                unreadAgentIds: chatService.unreadAgentIds
-                            )
-                            .padding(.horizontal, 16)
-                        }
-                        .padding(.vertical, 8)
-                        .overlay(alignment: .bottom) {
-                            Color.white.opacity(0.03).frame(height: 1)
-                        }
-                    }
+                    // Agent/room picker
+                    pickerSection
 
                     // Messages with fade edges
                     ZStack {
@@ -321,6 +315,9 @@ struct ChatView: View {
             if chatService.hasServer {
                 chatService.connectWebSocket()
             }
+            if roomService.hasBackend {
+                roomService.connect()
+            }
             if ChaosService.shared.shouldCheckNow {
                 Task {
                     if let instruction = await ChaosService.shared.fetchInstruction() {
@@ -332,6 +329,34 @@ struct ChatView: View {
         }
         .preferredColorScheme(.dark)
     }
+
+    // MARK: - Picker Section
+
+    @ViewBuilder
+    private var pickerSection: some View {
+        let showPicker = chatService.visibleAgents.count > 1 || !roomService.rooms.isEmpty
+        if showPicker {
+            ScrollView(.horizontal, showsIndicators: false) {
+                AgentPicker(
+                    selected: Binding(
+                        get: { chatService.selectedAgent },
+                        set: { chatService.selectedAgent = $0 }
+                    ),
+                    agents: chatService.visibleAgents,
+                    unreadAgentIds: chatService.unreadAgentIds,
+                    rooms: roomService.rooms,
+                    selectedRoom: $selectedRoom
+                )
+                .padding(.horizontal, 16)
+            }
+            .padding(.vertical, 8)
+            .overlay(alignment: .bottom) {
+                Color.white.opacity(0.03).frame(height: 1)
+            }
+        }
+    }
+
+    // MARK: - Computed Properties
 
     private var hasStreamingMessage: Bool {
         chatService.messages.contains { $0.isStreaming }
@@ -368,6 +393,8 @@ struct ChatView: View {
         case .disconnected: return "offline"
         }
     }
+
+    // MARK: - Actions
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
         if let lastMessage = chatService.messages.last {

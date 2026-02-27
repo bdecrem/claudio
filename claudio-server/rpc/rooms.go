@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nicebartender/claudio-server/db"
+	"github.com/nicebartender/claudio-server/joincode"
 	"github.com/nicebartender/claudio-server/ws"
 )
 
@@ -53,6 +54,9 @@ func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 	}
 	if invite != nil {
 		resp["inviteCode"] = invite.Code
+		if r.ExternalURL != "" {
+			resp["universalCode"] = joincode.Encode(r.ExternalURL, invite.Code)
+		}
 	}
 	client.SendJSON(ws.NewResponse(req.ID, resp))
 }
@@ -263,10 +267,14 @@ func (r *Router) handleRoomsCreateInvite(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
+	resp := map[string]interface{}{
 		"code":      invite.Code,
 		"expiresAt": invite.ExpiresAt,
-	}))
+	}
+	if r.ExternalURL != "" {
+		resp["universalCode"] = joincode.Encode(r.ExternalURL, invite.Code)
+	}
+	client.SendJSON(ws.NewResponse(req.ID, resp))
 }
 
 // helpers

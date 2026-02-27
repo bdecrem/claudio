@@ -1,6 +1,8 @@
 package openclaw
 
 import (
+	"fmt"
+	"log/slog"
 	"sync"
 )
 
@@ -17,18 +19,28 @@ func NewPool() *Pool {
 	}
 }
 
-func (p *Pool) Get(url, token string) *Client {
+// Get returns a connected client for the given URL/token, creating one if needed.
+func (p *Pool) Get(url, token string) (*Client, error) {
 	key := url + "|" + token
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if c, ok := p.clients[key]; ok && c.IsConnected() {
-		return c
+		p.mu.Unlock()
+		return c, nil
+	}
+	p.mu.Unlock()
+
+	// Create and connect a new client
+	slog.Info("openclaw pool: connecting", "url", url)
+	c := NewClient(url, token)
+	if err := c.Connect(); err != nil {
+		return nil, fmt.Errorf("pool connect: %w", err)
 	}
 
-	c := NewClient(url, token)
+	p.mu.Lock()
 	p.clients[key] = c
-	return c
+	p.mu.Unlock()
+
+	return c, nil
 }
 
 func (p *Pool) Close() {

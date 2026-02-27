@@ -77,10 +77,29 @@ final class RoomService {
             onAgentEvent: { _ in }  // Not used for rooms
         )
 
-        // Register for room events via the WebSocket client's event routing
-        // We'll handle room events through a custom approach since WebSocketClient
-        // currently only routes "chat" and "agent" events.
-        // For now, we'll poll after connect. Phase 3 will add proper event handling.
+        await webSocketClient.setRoomEventCallback { [weak self] eventName, payload in
+            guard let self else { return }
+            switch eventName {
+            case "room.message":
+                if let msg = RoomMessage(from: payload) {
+                    self.handleRoomMessageEvent(msg)
+                }
+            case "room.typing":
+                if let name = payload?["displayName"]?.stringValue,
+                   let roomId = payload?["roomId"]?.stringValue,
+                   roomId == self.activeRoom?.id {
+                    self.typingIndicator = "\(name) is typing..."
+                    Task {
+                        try? await Task.sleep(for: .seconds(3))
+                        if self.typingIndicator?.contains(name) == true {
+                            self.typingIndicator = nil
+                        }
+                    }
+                }
+            default:
+                break
+            }
+        }
     }
 
     @MainActor
@@ -280,20 +299,69 @@ final class RoomService {
 
     // MARK: - Invites
 
+    struct InviteResult {
+        let code: String
+        let universalCode: String?
+    }
+
     @MainActor
-    func createInvite(roomId: String, maxUses: Int = 0) async -> String? {
+    func createInvite(roomId: String, maxUses: Int = 0) async -> InviteResult? {
         do {
             var params: [String: AnyCodableValue] = ["roomId": .string(roomId)]
             if maxUses > 0 {
                 params["maxUses"] = .int(maxUses)
             }
             let response = try await webSocketClient.send(method: "rooms.createInvite", params: params)
-            guard response.ok, let payload = response.payload else { return nil }
-            return payload["code"]?.stringValue
+            guard response.ok, let payload = response.payload,
+                  let code = payload["code"]?.stringValue else { return nil }
+            let universalCode = payload["universalCode"]?.stringValue
+            return InviteResult(code: code, universalCode: universalCode)
         } catch {
             log.error("createInvite: \(error)")
             return nil
         }
+    }
+
+    // MARK: - Universal Join Code
+
+    @MainActor
+    func joinWithUniversalCode(_ code: String) async -> Room? {
+        guard let decoded = JoinCodeDecoder.decode(code) else {
+            log.error("joinWithUniversalCode: failed to decode")
+            return nil
+        }
+
+        // Strip https:// to get the raw URL for backendURL
+        var url = decoded.serverURL
+        // backendURL is stored without trailing slash
+        if url.hasSuffix("/") { url = String(url.dropLast()) }
+        backendURL = url
+
+        // Disconnect if currently connected to a different server
+        disconnect()
+
+        // Connect and wait for connected state
+        connect()
+
+        // Wait for connection with timeout
+        let connected = await waitForConnection(timeout: 10)
+        guard connected else {
+            log.error("joinWithUniversalCode: connection timeout")
+            return nil
+        }
+
+        return await joinRoom(inviteCode: decoded.inviteCode)
+    }
+
+    private func waitForConnection(timeout: TimeInterval) async -> Bool {
+        if isConnected { return true }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if isConnected { return true }
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        }
+        return isConnected
     }
 
     // MARK: - Agents

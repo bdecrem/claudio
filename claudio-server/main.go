@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/nicebartender/claudio-server/db"
+	"github.com/nicebartender/claudio-server/joincode"
 	"github.com/nicebartender/claudio-server/rpc"
 	"github.com/nicebartender/claudio-server/ws"
 )
@@ -28,7 +31,8 @@ func main() {
 	defer database.Close()
 
 	hub := ws.NewHub(database)
-	_ = rpc.NewRouter(hub, database)
+	router := rpc.NewRouter(hub, database)
+	router.ExternalURL = cfg.ExternalURL
 
 	go hub.Run()
 
@@ -48,6 +52,47 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// Invite preview — decodes universal code, validates invite, returns room info
+	http.HandleFunc("/invite/", func(w http.ResponseWriter, r *http.Request) {
+		code := strings.TrimPrefix(r.URL.Path, "/invite/")
+		if code == "" {
+			http.Error(w, `{"error":"missing code"}`, http.StatusBadRequest)
+			return
+		}
+
+		_, inviteCode, err := joincode.Decode(code)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid code: " + err.Error()})
+			return
+		}
+
+		invite, err := database.LookupInvite(inviteCode)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+
+		room, err := database.GetRoom(invite.RoomID)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "room not found"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"serverURL":  "https://" + cfg.ExternalURL,
+			"inviteCode": inviteCode,
+			"roomName":   room.Name,
+			"roomEmoji":  room.Emoji,
+		})
 	})
 
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)

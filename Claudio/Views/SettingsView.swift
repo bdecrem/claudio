@@ -8,6 +8,10 @@ struct SettingsView: View {
     @State private var editingIndex: Int?
     @State private var editURL = ""
     @State private var editToken = ""
+    @State private var joinCode = ""
+    @State private var isJoining = false
+    @State private var joinError: String?
+    @State private var joinSuccess = false
     @State private var dangerousSkipPermissions = UserDefaults.standard.bool(forKey: "dangerouslySkipPermissions")
     @State private var dangerousTogglePending = false
     @State private var showDangerousConfirm = false
@@ -19,6 +23,75 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 32) {
+
+                    // MARK: - Quick Join
+                    if let roomService {
+                        SettingsSection(title: "Quick Join") {
+                            VStack(spacing: 8) {
+                                VStack(spacing: 0) {
+                                    HStack(spacing: 10) {
+                                        ZStack(alignment: .leading) {
+                                            if joinCode.isEmpty {
+                                                Text("Paste join code")
+                                                    .font(.system(size: 15))
+                                                    .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                                            }
+                                            TextField("", text: $joinCode)
+                                                .font(.system(size: 15, design: .monospaced))
+                                                .foregroundStyle(Theme.textPrimary)
+                                                .tint(Theme.accent)
+                                                .autocorrectionDisabled()
+                                                .textInputAutocapitalization(.characters)
+                                        }
+
+                                        Button {
+                                            isJoining = true
+                                            joinError = nil
+                                            Task {
+                                                if let room = await roomService.joinWithUniversalCode(joinCode) {
+                                                    joinSuccess = true
+                                                    joinCode = ""
+                                                    // Brief delay to show success before dismissing
+                                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                                    dismiss()
+                                                } else {
+                                                    joinError = "Invalid code or couldn't connect"
+                                                }
+                                                isJoining = false
+                                            }
+                                        } label: {
+                                            if isJoining {
+                                                ProgressView()
+                                                    .scaleEffect(0.7)
+                                                    .tint(Theme.accent)
+                                            } else {
+                                                Text("Join")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(joinCode.isEmpty ? Theme.textDim : Theme.accent)
+                                            }
+                                        }
+                                        .disabled(joinCode.trimmingCharacters(in: .whitespaces).isEmpty || isJoining)
+                                    }
+                                    .padding(14)
+                                }
+                                .background(Theme.surface)
+                                .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+
+                                if let joinError {
+                                    Text(joinError)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Theme.danger.opacity(0.8))
+                                        .padding(.horizontal, 4)
+                                }
+                                if joinSuccess {
+                                    Text("Joined!")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Theme.green)
+                                        .padding(.horizontal, 4)
+                                }
+                            }
+                        }
+                    }
 
                     // MARK: - Servers
                     SettingsSection(title: "Servers") {
@@ -655,6 +728,8 @@ private struct ClaudioBackendSection: View {
     @State private var token: String = ""
     @State private var displayName: String = ""
     @State private var avatarEmoji: String = ""
+    @State private var showCreateRoom = false
+    @State private var showJoinRoom = false
 
     var body: some View {
         SettingsSection(title: "Claudio Backend") {
@@ -759,7 +834,39 @@ private struct ClaudioBackendSection: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 4)
+
+                // Room actions
+                if roomService.isConnected {
+                    HStack(spacing: 8) {
+                        Button { showCreateRoom = true } label: {
+                            Label("Create Room", systemImage: "plus")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundStyle(Theme.accent)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button { showJoinRoom = true } label: {
+                            Label("Join Room", systemImage: "link")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 4)
+                }
             }
+        }
+        .sheet(isPresented: $showCreateRoom) {
+            CreateRoomSheet(roomService: roomService)
+        }
+        .sheet(isPresented: $showJoinRoom) {
+            JoinRoomSheet(roomService: roomService)
         }
         .onAppear {
             url = roomService.backendURL

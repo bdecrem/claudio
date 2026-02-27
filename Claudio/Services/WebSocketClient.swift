@@ -20,6 +20,7 @@ actor WebSocketClient {
     var onStateChange: (@MainActor (ConnectionState) -> Void)?
     var onChatEvent: (@MainActor (ChatEvent) -> Void)?
     var onAgentEvent: (@MainActor (AgentEvent) -> Void)?
+    var onRoomEvent: (@MainActor (String, [String: AnyCodableValue]?) -> Void)?
 
     private(set) var connectionState: ConnectionState = .disconnected
 
@@ -50,6 +51,10 @@ actor WebSocketClient {
         self.onStateChange = onStateChange
         self.onChatEvent = onChatEvent
         self.onAgentEvent = onAgentEvent
+    }
+
+    func setRoomEventCallback(_ handler: @escaping @MainActor (String, [String: AnyCodableValue]?) -> Void) {
+        self.onRoomEvent = handler
     }
 
     func connect(serverURL: String, token: String) {
@@ -303,6 +308,11 @@ actor WebSocketClient {
                 if let handler = onAgentEvent {
                     await handler(agentEvent)
                 }
+            }
+
+        case _ where event.event.hasPrefix("room."):
+            if let handler = onRoomEvent {
+                await handler(event.event, event.payload)
             }
 
         default:

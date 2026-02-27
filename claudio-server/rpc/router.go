@@ -4,16 +4,19 @@ import (
 	"log/slog"
 
 	"github.com/nicebartender/claudio-server/db"
+	"github.com/nicebartender/claudio-server/openclaw"
 	"github.com/nicebartender/claudio-server/ws"
 )
 
 type Router struct {
-	Hub *ws.Hub
-	DB  *db.DB
+	Hub          *ws.Hub
+	DB           *db.DB
+	ExternalURL  string
+	OpenClawPool *openclaw.Pool
 }
 
 func NewRouter(hub *ws.Hub, database *db.DB) *Router {
-	r := &Router{Hub: hub, DB: database}
+	r := &Router{Hub: hub, DB: database, OpenClawPool: openclaw.NewPool()}
 	hub.RPCRouter = r.Handle
 	return r
 }

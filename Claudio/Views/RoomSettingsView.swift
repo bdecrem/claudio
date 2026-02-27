@@ -3,10 +3,12 @@ import SwiftUI
 struct RoomSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let roomService: RoomService
+    let chatService: ChatService
     let room: Room
     let onLeave: () -> Void
 
     @State private var inviteCode: String?
+    @State private var universalCode: String?
     @State private var isGeneratingCode = false
     @State private var showAddAgent = false
     @State private var showLeaveConfirm = false
@@ -31,26 +33,36 @@ struct RoomSettingsView: View {
                     // Invite code
                     SettingsSectionView(title: "Invite") {
                         VStack(spacing: 12) {
-                            if let code = inviteCode {
-                                HStack {
-                                    Text(code)
-                                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                            if let displayCode = universalCode ?? inviteCode {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(displayCode)
+                                        .font(.system(size: universalCode != nil ? 14 : 22, weight: .bold, design: .monospaced))
                                         .foregroundStyle(Theme.accent)
-                                        .kerning(2)
-                                    Spacer()
-                                    Button {
-                                        UIPasteboard.general.string = code
-                                    } label: {
-                                        Image(systemName: "doc.on.doc")
-                                            .font(.system(size: 15))
-                                            .foregroundStyle(Theme.textSecondary)
+                                        .kerning(universalCode != nil ? 1 : 2)
+                                        .textSelection(.enabled)
+                                    HStack {
+                                        if universalCode != nil {
+                                            Text("Share this code — it has everything needed to join")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(Theme.textDim)
+                                        }
+                                        Spacer()
+                                        Button {
+                                            UIPasteboard.general.string = displayCode
+                                        } label: {
+                                            Label("Copy", systemImage: "doc.on.doc")
+                                                .font(.system(size: 13))
+                                                .foregroundStyle(Theme.textSecondary)
+                                        }
                                     }
                                 }
                             } else {
                                 Button {
                                     isGeneratingCode = true
                                     Task {
-                                        inviteCode = await roomService.createInvite(roomId: displayRoom.id)
+                                        let result = await roomService.createInvite(roomId: displayRoom.id)
+                                        inviteCode = result?.code
+                                        universalCode = result?.universalCode
                                         isGeneratingCode = false
                                     }
                                 } label: {
@@ -173,7 +185,12 @@ struct RoomSettingsView: View {
             }
         }
         .sheet(isPresented: $showAddAgent) {
-            AddAgentSheet(roomService: roomService, roomId: displayRoom.id)
+            AddAgentSheet(
+                roomService: roomService,
+                chatService: chatService,
+                roomId: displayRoom.id,
+                existingAgentIds: Set(displayRoom.participants.filter(\.isAgent).map(\.displayName))
+            )
         }
         .alert("Leave Room?", isPresented: $showLeaveConfirm) {
             Button("Leave", role: .destructive) {

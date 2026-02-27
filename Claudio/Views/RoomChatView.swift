@@ -2,8 +2,8 @@ import SwiftUI
 
 struct RoomChatView: View {
     let roomService: RoomService
+    let chatService: ChatService
     let room: Room
-    let onDismiss: () -> Void
 
     @State private var messageText = ""
     @State private var showSettings = false
@@ -13,9 +13,6 @@ struct RoomChatView: View {
 
     var body: some View {
         ZStack {
-            Theme.background
-                .ignoresSafeArea()
-
             VStack(spacing: 0) {
                 // Header
                 roomHeader
@@ -75,9 +72,7 @@ struct RoomChatView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            RoomSettingsView(roomService: roomService, room: room, onLeave: {
-                onDismiss()
-            })
+            RoomSettingsView(roomService: roomService, chatService: chatService, room: room, onLeave: {})
         }
         .task {
             await roomService.enterRoom(room)
@@ -92,12 +87,8 @@ struct RoomChatView: View {
     private var roomHeader: some View {
         VStack(spacing: 0) {
             HStack {
-                Button { onDismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(width: 32, height: 32)
-                }
+                Spacer()
+                    .frame(width: 32)
 
                 Spacer()
 
@@ -120,9 +111,9 @@ struct RoomChatView: View {
 
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 17))
+                        .font(.system(size: 18))
                         .foregroundStyle(Theme.textSecondary)
-                        .frame(width: 32, height: 32)
+                        .padding(6)
                 }
             }
             .padding(.horizontal, 16)

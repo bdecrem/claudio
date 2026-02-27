@@ -35,7 +35,8 @@
 		T10000010000000000000002 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000002 /* ChatServiceTests.swift */; };
 		G10000010000000000000001 /* Room.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000001 /* Room.swift */; };
 		G10000010000000000000002 /* RoomService.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000002 /* RoomService.swift */; };
-		G10000010000000000000003 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000003 /* MainView.swift */; };
+		J10000010000000000000001 /* JoinCodeDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = J20000010000000000000001 /* JoinCodeDecoder.swift */; };
+
 		G10000010000000000000004 /* RoomListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000004 /* RoomListView.swift */; };
 		G10000010000000000000005 /* RoomChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000005 /* RoomChatView.swift */; };
 		G10000010000000000000006 /* RoomMessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000006 /* RoomMessageBubble.swift */; };
@@ -79,7 +80,8 @@
 		T30000010000000000000001 /* ClaudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		G20000010000000000000001 /* Room.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Room.swift; sourceTree = "<group>"; };
 		G20000010000000000000002 /* RoomService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomService.swift; sourceTree = "<group>"; };
-		G20000010000000000000003 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		J20000010000000000000001 /* JoinCodeDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinCodeDecoder.swift; sourceTree = "<group>"; };
+
 		G20000010000000000000004 /* RoomListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomListView.swift; sourceTree = "<group>"; };
 		G20000010000000000000005 /* RoomChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomChatView.swift; sourceTree = "<group>"; };
 		G20000010000000000000006 /* RoomMessageBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomMessageBubble.swift; sourceTree = "<group>"; };
@@ -166,7 +168,7 @@
 				A2000001000000000000000E /* LaunchScreen.swift */,
 				B20000010000000000000002 /* VoiceSessionView.swift */,
 				F20000010000000000000001 /* ToolCallCard.swift */,
-				G20000010000000000000003 /* MainView.swift */,
+
 				G20000010000000000000004 /* RoomListView.swift */,
 				G20000010000000000000005 /* RoomChatView.swift */,
 				G20000010000000000000006 /* RoomMessageBubble.swift */,
@@ -191,6 +193,7 @@
 				N20000010000000000000001 /* NotificationService.swift */,
 				N20000010000000000000002 /* AppDelegate.swift */,
 				G20000010000000000000002 /* RoomService.swift */,
+				J20000010000000000000001 /* JoinCodeDecoder.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -349,7 +352,7 @@
 				N10000010000000000000002 /* AppDelegate.swift in Sources */,
 				G10000010000000000000001 /* Room.swift in Sources */,
 				G10000010000000000000002 /* RoomService.swift in Sources */,
-				G10000010000000000000003 /* MainView.swift in Sources */,
+
 				G10000010000000000000004 /* RoomListView.swift in Sources */,
 				G10000010000000000000005 /* RoomChatView.swift in Sources */,
 				G10000010000000000000006 /* RoomMessageBubble.swift in Sources */,
@@ -358,6 +361,7 @@
 				G10000010000000000000009 /* JoinRoomSheet.swift in Sources */,
 				G1000001000000000000000A /* AddAgentSheet.swift in Sources */,
 				G1000001000000000000000B /* MentionOverlay.swift in Sources */,
+				J10000010000000000000001 /* JoinCodeDecoder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
