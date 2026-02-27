@@ -154,6 +154,8 @@ struct RoomChatView: View {
                     .padding(.vertical, 16)
                 }
             }
+            .contentMargins(.top, 60, for: .scrollContent)
+            .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
             .onChange(of: roomService.activeRoomMessages.count) {
                 if let last = roomService.activeRoomMessages.last {

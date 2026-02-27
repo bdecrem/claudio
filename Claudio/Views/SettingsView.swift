@@ -439,6 +439,7 @@ struct SettingsView: View {
                 .padding(.bottom, 10)
                 .background(Theme.background)
             }
+            .scrollDismissesKeyboard(.interactively)
             .sheet(item: $editingIndex) { index in
                 ServerEditSheet(
                     isNew: index == -1,
