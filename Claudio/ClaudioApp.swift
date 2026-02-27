@@ -8,7 +8,7 @@ struct ClaudioApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ChatView()
+                MainView()
 
                 if showLaunch {
                     LaunchScreen()

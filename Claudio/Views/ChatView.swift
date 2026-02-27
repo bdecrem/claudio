@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 
 struct ChatView: View {
+    var roomService: RoomService?
     @State private var chatService = ChatService()
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var voiceService = VoiceService()
@@ -300,7 +301,7 @@ struct ChatView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView(chatService: chatService)
+            SettingsView(chatService: chatService, roomService: roomService)
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 4, matching: .images)
         .onChange(of: selectedPhotos) { _, items in

@@ -14,6 +14,20 @@ enum Theme {
     static let green = Color(hex: "3DBD6C")
     static let danger = Color(hex: "C0392B")
 
+    // Participant colors for group chat differentiation
+    static let participantColors: [Color] = [
+        Color(hex: "D4A44C"),  // warm gold (accent)
+        Color(hex: "6CB4EE"),  // soft blue
+        Color(hex: "B57EDC"),  // lavender
+        Color(hex: "3DBD6C"),  // green
+        Color(hex: "E88D67"),  // coral
+    ]
+
+    static func participantColor(for id: String) -> Color {
+        let hash = abs(id.hashValue)
+        return participantColors[hash % participantColors.count]
+    }
+
     // MARK: - Fonts
     static let body: Font = .system(.body, design: .rounded)
     static let caption: Font = .system(.caption, design: .rounded)
