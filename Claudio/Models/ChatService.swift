@@ -19,6 +19,7 @@ final class ChatService {
     private var chatHistories: [String: [Message]] = [:]
     private var audioPlayer: AVAudioPlayer?
     private var ttsDelegate: TTSDelegate?
+    private var queuedVoiceReplyAudio: [Data] = []
     private var pendingAgents: Set<String> = []
     private let webSocketClient = WebSocketClient()
 
@@ -416,15 +417,36 @@ final class ChatService {
             if let continuation = voiceContinuation {
                 voiceContinuation = nil
                 pendingVoiceTTS = false
-                continuation.resume(returning: finalText)
+                let attachments = event.audioAttachments
+                let server = selectedServer
+                Task { [weak self] in
+                    guard let self else { return }
+                    let audioData = await self.extractPlayableMP3Data(from: attachments, server: server)
+                    await MainActor.run {
+                        if let audioData {
+                            self.queuedVoiceReplyAudio.append(audioData)
+                            continuation.resume(returning: finalText)
+                        } else {
+                            continuation.resume(throwing: WebSocketError.serverError("Voice response missing playable MP3 attachment."))
+                        }
+                    }
+                }
             }
 
             // Handle inline voice TTS
-            if pendingVoiceTTS, !finalText.isEmpty {
+            if pendingVoiceTTS {
                 pendingVoiceTTS = false
-                let agentId = selectedAgentId
-                if let server = selectedServer {
-                    Task { await playTTS(for: finalText, agentId: agentId, server: server) }
+                let attachments = event.audioAttachments
+                let server = selectedServer
+                Task { [weak self] in
+                    guard let self else { return }
+                    if let audioData = await self.extractPlayableMP3Data(from: attachments, server: server) {
+                        _ = await self.playAudioData(audioData, source: "inline-voice-mp3")
+                    } else {
+                        await MainActor.run {
+                            self.connectionError = "Voice response missing playable MP3 attachment."
+                        }
+                    }
                 }
             }
 
@@ -589,7 +611,12 @@ final class ChatService {
 
     @MainActor
     func playTTSPublic(for text: String, agentId: String, server: Server) async {
-        await playTTS(for: text, agentId: agentId, server: server)
+        guard !queuedVoiceReplyAudio.isEmpty else {
+            connectionError = "Voice response missing playable MP3 attachment."
+            return
+        }
+        let data = queuedVoiceReplyAudio.removeFirst()
+        _ = await playAudioData(data, source: "voice-reply-mp3")
     }
 
     /// Convert ws:// or wss:// URLs to http:// or https:// for HTTP endpoints (TTS)
@@ -603,46 +630,119 @@ final class ChatService {
     }
 
     @MainActor
-    private func playTTS(for text: String, agentId: String, server: Server) async {
-        let baseURL = httpURL(for: server.url)
-        guard let url = URL(string: "\(baseURL)/api/tts") else { return }
+    private func playAudioAttachments(_ attachments: [ChatEvent.AudioAttachment], server: Server?) async -> Bool {
+        guard !attachments.isEmpty else { return false }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !server.token.isEmpty {
-            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
+        for attachment in attachments {
+            if let base64 = attachment.base64Data,
+               let data = Data(base64Encoded: base64),
+               !data.isEmpty {
+                if await playAudioData(data, source: "chat-attachment-base64") {
+                    return true
+                }
+            }
+
+            if let urlString = attachment.url,
+               let data = await fetchAudioAttachmentData(urlString: urlString, server: server),
+               !data.isEmpty {
+                if await playAudioData(data, source: "chat-attachment-url") {
+                    return true
+                }
+            }
+
+            if let mediaPath = attachment.mediaPath, !mediaPath.isEmpty {
+                log.info("Audio attachment includes media path reference (not directly fetchable here): \(mediaPath)")
+            }
         }
 
-        let body: [String: String] = ["text": text, "agent": agentId]
-        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return }
-        request.httpBody = httpBody
+        return false
+    }
 
+    @MainActor
+    private func extractPlayableMP3Data(from attachments: [ChatEvent.AudioAttachment], server: Server?) async -> Data? {
+        guard !attachments.isEmpty else { return nil }
+
+        for attachment in attachments {
+            let mime = attachment.mimeType?.lowercased() ?? ""
+            let likelyMP3 = mime.contains("audio/mpeg")
+                || mime.contains("audio/mp3")
+                || (attachment.url?.lowercased().contains(".mp3") == true)
+                || (attachment.mediaPath?.lowercased().contains(".mp3") == true)
+
+            guard likelyMP3 else { continue }
+
+            if let base64 = attachment.base64Data,
+               let data = Data(base64Encoded: base64),
+               !data.isEmpty {
+                return data
+            }
+
+            if let urlString = attachment.url,
+               let data = await fetchAudioAttachmentData(urlString: urlString, server: server),
+               !data.isEmpty {
+                return data
+            }
+        }
+
+        return nil
+    }
+
+    @MainActor
+    private func fetchAudioAttachmentData(urlString: String, server: Server?) async -> Data? {
+        guard let url = URL(string: urlString) else { return nil }
+        var request = URLRequest(url: url)
+        if let host = url.host?.lowercased(), host.contains("ngrok") {
+            request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        }
+        if let server, !server.token.isEmpty {
+            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
+        }
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode),
-                  !data.isEmpty else { return }
+                  (200...299).contains(httpResponse.statusCode) else {
+                return nil
+            }
+            let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
+            if !contentType.isEmpty, !contentType.hasPrefix("audio/") {
+                log.error("Audio attachment fetch returned non-audio content type: \(contentType)")
+                return nil
+            }
+            return data
+        } catch {
+            log.error("Failed to fetch audio attachment URL: \(error)")
+            return nil
+        }
+    }
 
+    @MainActor
+    private func playAudioData(_ data: Data, source: String) async -> Bool {
+        do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
 
             audioPlayer = try AVAudioPlayer(data: data)
 
-            // Wait for playback to finish so callers (e.g. voice mode) don't
-            // immediately start the mic and kill audio output.
+            // Await playback completion so callers (voice mode) don't
+            // immediately start the mic and switch audio session to .record.
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                let delegate = TTSDelegate { [weak self] in
-                    DispatchQueue.main.async { self?.isSpeaking = false }
+                let delegate = TTSDelegate {
                     continuation.resume()
                 }
                 self.ttsDelegate = delegate
                 audioPlayer?.delegate = delegate
                 isSpeaking = true
                 audioPlayer?.play()
+                log.info("playAudioData[\(source)]: playing \(self.audioPlayer?.duration ?? 0)s")
             }
+            self.ttsDelegate = nil
+            isSpeaking = false
+            log.info("playAudioData[\(source)]: done")
+            return true
         } catch {
-            // TTS is enhancement — fail silently
+            log.error("playAudioData[\(source)] failed: \(error)")
+            isSpeaking = false
+            return false
         }
     }
 

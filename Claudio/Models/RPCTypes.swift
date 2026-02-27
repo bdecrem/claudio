@@ -38,7 +38,15 @@ struct ChatEvent {
     let runId: String
     let state: ChatEventState
     let text: String?
+    let audioAttachments: [AudioAttachment]
     let errorMessage: String?
+
+    struct AudioAttachment {
+        let mimeType: String?
+        let base64Data: String?
+        let url: String?
+        let mediaPath: String?
+    }
 
     enum ChatEventState: String {
         case delta
@@ -57,17 +65,100 @@ struct ChatEvent {
               let state = ChatEventState(rawValue: stateStr) else { return nil }
         self.state = state
 
-        // Extract text from message.content[0].text
-        if let message = payload["message"]?.objectValue,
-           let content = message["content"]?.arrayValue,
-           let first = content.first?.objectValue,
-           let text = first["text"]?.stringValue {
-            self.text = text
-        } else {
-            self.text = nil
+        var extractedText: [String] = []
+        var extractedAudio: [AudioAttachment] = []
+
+        if let message = payload["message"]?.objectValue {
+            if let content = message["content"]?.arrayValue {
+                for block in content {
+                    guard let obj = block.objectValue else { continue }
+                    if let text = obj["text"]?.stringValue, !text.isEmpty {
+                        extractedText.append(text)
+                    }
+                    if let audio = Self.extractAudio(from: obj) {
+                        extractedAudio.append(audio)
+                    }
+                }
+            }
+            if let attachments = message["attachments"]?.arrayValue {
+                for attachment in attachments {
+                    guard let obj = attachment.objectValue else { continue }
+                    if let audio = Self.extractAudio(from: obj) {
+                        extractedAudio.append(audio)
+                    }
+                }
+            }
         }
 
+        if let attachments = payload["attachments"]?.arrayValue {
+            for attachment in attachments {
+                guard let obj = attachment.objectValue else { continue }
+                if let audio = Self.extractAudio(from: obj) {
+                    extractedAudio.append(audio)
+                }
+            }
+        }
+
+        let joinedText = extractedText.joined()
+        self.text = joinedText.isEmpty ? nil : joinedText
+        self.audioAttachments = extractedAudio
+
         self.errorMessage = payload["errorMessage"]?.stringValue
+    }
+
+    private static func extractAudio(from object: [String: AnyCodableValue]) -> AudioAttachment? {
+        let type = object["type"]?.stringValue?.lowercased()
+        let mimeType = object["mimeType"]?.stringValue ?? object["mime_type"]?.stringValue
+        let text = object["text"]?.stringValue
+        let isMediaText = (text?.hasPrefix("MEDIA:") == true) && (text?.lowercased().contains(".mp3") == true)
+
+        let isLikelyAudio = (type == "audio")
+            || (mimeType?.lowercased().hasPrefix("audio/") == true)
+            || object["audio"]?.objectValue != nil
+            || isMediaText
+
+        guard isLikelyAudio else { return nil }
+
+        let directData = object["data"]?.stringValue
+            ?? object["base64"]?.stringValue
+            ?? object["content"]?.stringValue
+        let directURL = object["url"]?.stringValue
+        let directPath = object["path"]?.stringValue
+            ?? object["mediaPath"]?.stringValue
+
+        var nestedData: String?
+        var nestedURL: String?
+        var nestedPath: String?
+        if let nested = object["audio"]?.objectValue {
+            nestedData = nested["data"]?.stringValue
+                ?? nested["base64"]?.stringValue
+                ?? nested["content"]?.stringValue
+            nestedURL = nested["url"]?.stringValue
+            nestedPath = nested["path"]?.stringValue
+                ?? nested["mediaPath"]?.stringValue
+        }
+
+        let mediaPathFromText: String? = {
+            if let txt = text, txt.hasPrefix("MEDIA:") {
+                return String(txt.dropFirst("MEDIA:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            return nil
+        }()
+
+        let base64Data = directData ?? nestedData
+        let url = directURL ?? nestedURL
+        let mediaPath = directPath ?? nestedPath ?? mediaPathFromText
+
+        if base64Data == nil, url == nil, mediaPath == nil {
+            return nil
+        }
+
+        return AudioAttachment(
+            mimeType: mimeType ?? object["audio"]?.objectValue?["mimeType"]?.stringValue,
+            base64Data: base64Data,
+            url: url,
+            mediaPath: mediaPath
+        )
     }
 }
 

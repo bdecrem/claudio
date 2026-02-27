@@ -166,7 +166,7 @@ final class VoiceService {
 
             // TTS
             state = .speaking
-            if let ttsHandler {
+            if let ttsHandler, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 await ttsHandler(content)
             }
 
@@ -180,7 +180,7 @@ final class VoiceService {
             return
         } catch {
             log.error("Voice send error: \(error)")
-            state = .error("Connection error.")
+            state = .error(error.localizedDescription)
         }
     }
 }
