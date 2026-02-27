@@ -151,12 +151,19 @@ actor WebSocketClient {
     func agentsList() async throws -> [WSAgent] {
         let response = try await send(method: "agents.list")
 
+        log.info("agents.list raw payload: \(String(describing: response.payload))")
+
         guard response.ok, let payload = response.payload,
               let agentsArray = payload["agents"]?.arrayValue else {
+            log.warning("agents.list: ok=\(response.ok), has payload=\(response.payload != nil), has agents key=\(response.payload?["agents"] != nil)")
             return []
         }
 
-        return agentsArray.compactMap { WSAgent(from: $0) }
+        let agents = agentsArray.compactMap { WSAgent(from: $0) }
+        for a in agents {
+            log.info("agents.list parsed: id='\(a.id)' name='\(a.name)' emoji=\(a.emoji ?? "nil")")
+        }
+        return agents
     }
 
     // MARK: - Device Registration

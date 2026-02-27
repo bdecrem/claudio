@@ -270,9 +270,15 @@ struct WSAgent {
         guard let obj = value.objectValue,
               let id = obj["id"]?.stringValue else { return nil }
         self.id = id
-        self.name = obj["name"]?.stringValue ?? id
-        self.emoji = obj["emoji"]?.stringValue
-        self.color = obj["color"]?.stringValue
+        // Prefer identity.name (display name like "Mave 🌊") over top-level name (config name like "Main")
+        let identity = obj["identity"]?.objectValue
+        self.name = identity?["name"]?.stringValue
+            ?? obj["name"]?.stringValue
+            ?? id
+        self.emoji = identity?["emoji"]?.stringValue
+            ?? obj["emoji"]?.stringValue
+        self.color = identity?["color"]?.stringValue
+            ?? obj["color"]?.stringValue
     }
 }
 

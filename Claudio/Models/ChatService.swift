@@ -207,7 +207,9 @@ final class ChatService {
 
     /// Find the raw agent ID for the currently selected agent
     var selectedAgentId: String {
-        agents.first(where: { $0.id == selectedAgent })?.agentId ?? selectedAgent
+        let agent = agents.first(where: { $0.id == selectedAgent })
+            ?? agents.first(where: { $0.agentId == selectedAgent })
+        return agent?.agentId ?? selectedAgent
     }
 
     /// Session key for current agent (format: "agent:{agentId}:main")
@@ -293,6 +295,9 @@ final class ChatService {
         do {
             let wsAgents = try await webSocketClient.agentsList()
             log.info("fetchAgentsViaWS: got \(wsAgents.count) agents")
+            for a in wsAgents {
+                log.info("fetchAgentsViaWS: raw agent id='\(a.id)' name='\(a.name)'")
+            }
 
             var allAgents: [Agent] = []
             for a in wsAgents {

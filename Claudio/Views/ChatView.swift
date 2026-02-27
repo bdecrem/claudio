@@ -341,7 +341,9 @@ struct ChatView: View {
     }
 
     private var currentAgentName: String {
-        if let agent = chatService.agents.first(where: { $0.id == chatService.selectedAgent }) {
+        // Match by composite id first, then fall back to raw agentId
+        if let agent = chatService.agents.first(where: { $0.id == chatService.selectedAgent })
+            ?? chatService.agents.first(where: { $0.agentId == chatService.selectedAgent }) {
             return agent.name
         }
         return chatService.selectedAgent.isEmpty ? "Claudio" : chatService.selectedAgent
