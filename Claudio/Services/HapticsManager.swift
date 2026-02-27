@@ -1,3 +1,4 @@
+#if os(iOS)
 import UIKit
 
 enum HapticsManager {
@@ -13,3 +14,10 @@ enum HapticsManager {
         UISelectionFeedbackGenerator().selectionChanged()
     }
 }
+#else
+enum HapticsManager {
+    static func tap() {}
+    static func success() {}
+    static func selection() {}
+}
+#endif

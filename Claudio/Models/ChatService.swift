@@ -718,8 +718,10 @@ final class ChatService {
     @MainActor
     private func playAudioData(_ data: Data, source: String) async -> Bool {
         do {
+            #if os(iOS)
             try AVAudioSession.sharedInstance().setCategory(.playback)
             try AVAudioSession.sharedInstance().setActive(true)
+            #endif
 
             audioPlayer = try AVAudioPlayer(data: data)
 

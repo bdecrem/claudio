@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -167,7 +170,9 @@ struct SettingsView: View {
                                 .font(Theme.body)
                                 .foregroundStyle(Theme.textPrimary)
                                 .autocorrectionDisabled()
+                                #if os(iOS)
                                 .textInputAutocapitalization(.never)
+                                #endif
                             }
                             .padding(14)
                             .background(Theme.surface)
@@ -331,7 +336,9 @@ struct SettingsView: View {
                 .padding(.bottom, 40)
             }
             .background(Theme.background)
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
             .safeAreaInset(edge: .top) {
                 HStack {
                     // Balance spacer for centering
@@ -477,9 +484,13 @@ private struct ServerEditSheet: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(Theme.textPrimary)
                                 .tint(Theme.accent)
+                                #if os(iOS)
                                 .keyboardType(.URL)
+                                #endif
                                 .autocorrectionDisabled()
+                                #if os(iOS)
                                 .textInputAutocapitalization(.never)
+                                #endif
                         }
                     }
                     .padding(14)
@@ -495,7 +506,9 @@ private struct ServerEditSheet: View {
                             .foregroundStyle(Theme.textPrimary)
                             .tint(Theme.accent)
                             .autocorrectionDisabled()
+                            #if os(iOS)
                             .textInputAutocapitalization(.never)
+                            #endif
                     }
                     .padding(14)
                 }
@@ -513,13 +526,15 @@ private struct ServerEditSheet: View {
             }
             .background(Theme.background)
             .navigationTitle(isNew ? "Add Server" : "Edit Server")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                         .foregroundStyle(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: onSave)
                         .foregroundStyle(Theme.accent)
                         .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -633,9 +648,11 @@ private struct NotificationSettingsSection: View {
     }
 
     private func openAppSettings() {
+        #if os(iOS)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
+        #endif
     }
 }
 

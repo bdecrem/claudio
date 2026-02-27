@@ -31,6 +31,7 @@
 		F10000010000000000000001 /* ToolCallCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000001 /* ToolCallCard.swift */; };
 		N10000010000000000000001 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000001 /* NotificationService.swift */; };
 		N10000010000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000002 /* AppDelegate.swift */; };
+		P10000010000000000000001 /* PlatformImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = P20000010000000000000001 /* PlatformImage.swift */; };
 		T10000010000000000000001 /* RPCTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000001 /* RPCTypesTests.swift */; };
 		T10000010000000000000002 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000002 /* ChatServiceTests.swift */; };
 /* End PBXBuildFile section */
@@ -62,6 +63,7 @@
 		F20000010000000000000001 /* ToolCallCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallCard.swift; sourceTree = "<group>"; };
 		N20000010000000000000001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		N20000010000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		P20000010000000000000001 /* PlatformImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformImage.swift; sourceTree = "<group>"; };
 		N20000010000000000000003 /* Claudio.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Claudio.entitlements; sourceTree = "<group>"; };
 		T20000010000000000000001 /* RPCTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypesTests.swift; sourceTree = "<group>"; };
 		T20000010000000000000002 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
@@ -158,6 +160,7 @@
 				E20000010000000000000003 /* WebSocketClient.swift */,
 				N20000010000000000000001 /* NotificationService.swift */,
 				N20000010000000000000002 /* AppDelegate.swift */,
+				P20000010000000000000001 /* PlatformImage.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -314,6 +317,7 @@
 				F10000010000000000000001 /* ToolCallCard.swift in Sources */,
 				N10000010000000000000001 /* NotificationService.swift in Sources */,
 				N10000010000000000000002 /* AppDelegate.swift in Sources */,
+				P10000010000000000000001 /* PlatformImage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,9 +355,12 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = YES;
-				SDKROOT = iphoneos;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -375,8 +382,11 @@
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				SDKROOT = iphoneos;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -406,8 +416,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -435,8 +446,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -449,12 +461,13 @@
 				DEVELOPMENT_TEAM = 274T5WCVD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Claudio.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Claudio";
 			};
 			name = Debug;
@@ -468,12 +481,13 @@
 				DEVELOPMENT_TEAM = 274T5WCVD2;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Claudio.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Claudio";
 			};
 			name = Release;

@@ -235,8 +235,8 @@ struct ChatView: View {
                             HStack(spacing: 8) {
                                 ForEach(pendingImages) { img in
                                     ZStack(alignment: .topTrailing) {
-                                        if let uiImage = UIImage(data: img.data) {
-                                            Image(uiImage: uiImage)
+                                        if let image = PlatformImage(data: img.data) {
+                                            Image(platformImage: image)
                                                 .resizable()
                                                 .aspectRatio(contentMode: .fill)
                                                 .frame(width: 56, height: 56)
@@ -307,6 +307,7 @@ struct ChatView: View {
             Task { await loadSelectedPhotos(items) }
             selectedPhotos = []
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $showVoiceSession) {
             VoiceSessionView(
                 voiceService: voiceService,
@@ -315,6 +316,17 @@ struct ChatView: View {
             .background(Theme.background)
             .preferredColorScheme(.dark)
         }
+        #else
+        .sheet(isPresented: $showVoiceSession) {
+            VoiceSessionView(
+                voiceService: voiceService,
+                onDismiss: { endVoiceSession() }
+            )
+            .background(Theme.background)
+            .preferredColorScheme(.dark)
+            .frame(minWidth: 400, minHeight: 500)
+        }
+        #endif
         .onAppear {
             speechRecognizer.requestAuthorization()
             if chatService.hasServer {
@@ -401,15 +413,39 @@ struct ChatView: View {
     }
 
     private func resizeImageData(_ data: Data, maxDimension: CGFloat) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let size = image.size
-        let scale = min(maxDimension / max(size.width, size.height), 1.0)
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: newSize)
-        let resized = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: newSize))
-        }
-        return resized.jpegData(compressionQuality: 0.7)
+        guard let cgImage = cgImageFromData(data) else { return nil }
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        let scale = min(maxDimension / max(width, height), 1.0)
+        let newWidth = Int(width * scale)
+        let newHeight = Int(height * scale)
+
+        guard let colorSpace = cgImage.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: nil,
+                  width: newWidth,
+                  height: newHeight,
+                  bitsPerComponent: 8,
+                  bytesPerRow: 0,
+                  space: colorSpace,
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return nil }
+
+        context.interpolationQuality = .high
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
+
+        guard let resizedCG = context.makeImage() else { return nil }
+
+        let mutableData = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(mutableData as CFMutableData, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, resizedCG, [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return mutableData as Data
+    }
+
+    private func cgImageFromData(_ data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
     private func startVoiceSession() {

@@ -1,6 +1,8 @@
 import Foundation
 import UserNotifications
+#if canImport(UIKit)
 import UIKit
+#endif
 import os
 
 private let log = Logger(subsystem: "com.claudio.app", category: "Notifications")
@@ -49,7 +51,9 @@ final class NotificationService {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
             permissionState = granted ? .authorized : .denied
             if granted {
+                #if os(iOS)
                 UIApplication.shared.registerForRemoteNotifications()
+                #endif
                 log.info("Push permission granted, registering for remote notifications")
             } else {
                 log.info("Push permission denied by user")

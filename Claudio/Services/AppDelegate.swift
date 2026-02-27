@@ -1,3 +1,4 @@
+#if os(iOS)
 import UIKit
 import UserNotifications
 import os
@@ -46,3 +47,4 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         log.info("Notification tapped: \(response.notification.request.identifier)")
     }
 }
+#endif

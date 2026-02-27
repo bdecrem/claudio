@@ -37,8 +37,8 @@ struct MessageBubble: View {
                     if message.role == .user { Spacer(minLength: 60) }
                     HStack(spacing: 6) {
                         ForEach(message.imageAttachments) { img in
-                            if let uiImage = UIImage(data: img.data) {
-                                Image(uiImage: uiImage)
+                            if let image = PlatformImage(data: img.data) {
+                                Image(platformImage: image)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(maxWidth: 200, maxHeight: 200)
