@@ -363,6 +363,11 @@ final class ChatService {
 
     @MainActor
     private func handleChatEvent(_ event: ChatEvent) {
+        log.info("handleChatEvent: state=\(event.state.rawValue) text=\(event.text?.prefix(50) ?? "nil") imageURLs=\(event.imageURLs.count) audio=\(event.audioAttachments.count)")
+        for (i, url) in event.imageURLs.enumerated() {
+            log.info("  imageURL[\(i)]: \(url.prefix(120))")
+        }
+
         // Mark as unread if this event is for a non-selected agent
         if !event.sessionKey.isEmpty,
            let compositeId = compositeIdFromSessionKey(event.sessionKey),
@@ -514,6 +519,8 @@ final class ChatService {
 
     @MainActor
     private func handleAgentEvent(_ event: AgentEvent) {
+        log.info("handleAgentEvent: stream=\(event.stream) phase=\(event.phase) tool=\(event.toolName ?? "nil") meta=\(event.meta?.prefix(80) ?? "nil") output=\(event.output?.prefix(120) ?? "nil") imageRelURL=\(event.imageRelativeURL ?? "nil")")
+
         // Only handle tool stream events
         guard event.stream == "tool" else { return }
 

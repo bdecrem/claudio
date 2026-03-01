@@ -266,6 +266,11 @@ actor WebSocketClient {
 
         case "event":
             if let event = try? JSONDecoder().decode(RPCEvent.self, from: data) {
+                // Log raw payload for image-related debugging
+                if event.event == "agent" || event.event == "chat" {
+                    let preview = text.prefix(500)
+                    log.info("RAW \(event.event): \(preview)")
+                }
                 await handleEvent(event)
             }
 
