@@ -316,7 +316,7 @@ final class ChatService {
             connectionError = nil
 
             if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
-                selectedAgent = agents.first?.id ?? ""
+                selectedAgent = visibleAgents.first?.id ?? agents.first?.id ?? ""
                 log.info("fetchAgentsViaWS: selected '\(self.selectedAgent)'")
             }
         } catch {

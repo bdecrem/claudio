@@ -96,6 +96,21 @@ struct ChatView: View {
                                     .hoverEffect(.lift)
                             }
                             .keyboardShortcut(",", modifiers: .command)
+                            .contextMenu {
+                                if chatService.savedServers.count > 1 {
+                                    ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
+                                        Button {
+                                            chatService.switchServer(to: index)
+                                        } label: {
+                                            if index == chatService.activeServerIndex {
+                                                Label(serverDisplayName(for: server.url), systemImage: "checkmark")
+                                            } else {
+                                                Text(serverDisplayName(for: server.url))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
@@ -401,6 +416,14 @@ struct ChatView: View {
         case .pairingRequired: return "pairing needed"
         case .disconnected: return "offline"
         }
+    }
+
+    private func serverDisplayName(for url: String) -> String {
+        var name = url
+        for prefix in ["https://", "http://"] {
+            if name.hasPrefix(prefix) { name = String(name.dropFirst(prefix.count)) }
+        }
+        return name
     }
 
     // MARK: - Actions
