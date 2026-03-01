@@ -2,7 +2,7 @@ import SwiftUI
 import PhotosUI
 
 struct ChatView: View {
-    @State private var chatService = ChatService()
+    @Bindable var chatService: ChatService
     @State private var roomService = RoomService()
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var voiceService = VoiceService()
@@ -14,6 +14,7 @@ struct ChatView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var showPhotoPicker = false
     @State private var selectedRoom: Room?
+    @State private var showNotificationPrompt = false
 
     var body: some View {
         ZStack {
@@ -309,6 +310,28 @@ struct ChatView: View {
             )
             .background(Theme.background)
             .preferredColorScheme(.dark)
+        }
+        .alert("Enable Notifications?", isPresented: $showNotificationPrompt) {
+            Button("Enable") {
+                Task {
+                    await NotificationService.shared.requestPermission()
+                    NotificationService.shared.notificationsEnabled = true
+                }
+                NotificationService.shared.hasPromptedForNotifications = true
+            }
+            Button("Not Now", role: .cancel) {
+                NotificationService.shared.hasPromptedForNotifications = true
+            }
+        } message: {
+            Text("Get notified when agents respond to you.")
+        }
+        .onChange(of: chatService.messages.count) {
+            // Prompt after the first assistant response if not yet prompted
+            if !NotificationService.shared.hasPromptedForNotifications,
+               chatService.messages.contains(where: { $0.role == .user }),
+               chatService.messages.contains(where: { $0.role == .assistant && !$0.isStreaming }) {
+                showNotificationPrompt = true
+            }
         }
         .onAppear {
             speechRecognizer.requestAuthorization()
