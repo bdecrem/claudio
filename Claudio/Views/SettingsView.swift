@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Muted text for settings rows — avoids bright white dominating the hierarchy
+private let settingsText = Color(hex: "999999")
+
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let chatService: ChatService
@@ -24,9 +27,172 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 32) {
 
+                    // MARK: - Servers
+                    if chatService.savedServers.isEmpty {
+                        SettingsSection(title: "Servers") {
+                            Button {
+                                editingIndex = -1
+                                editURL = ""
+                                editToken = ""
+                            } label: {
+                                VStack(spacing: 10) {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 28, weight: .medium))
+                                        .foregroundStyle(Theme.accent)
+                                    Text("Add Server")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Theme.accent.opacity(0.7))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 28)
+                                .background(Theme.accent.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                                        .strokeBorder(Theme.accent.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        SettingsSection(title: "Servers") {
+                            Button {
+                                editingIndex = -1
+                                editURL = ""
+                                editToken = ""
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        } content: {
+                            VStack(spacing: 0) {
+                                ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
+                                    let isActive = index == chatService.activeServerIndex
+
+                                    if index > 0 {
+                                        Divider()
+                                            .background(Theme.border)
+                                            .padding(.leading, 16)
+                                    }
+
+                                    Button {
+                                        if !isActive {
+                                            chatService.switchServer(to: index)
+                                        }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Circle()
+                                                .fill(isActive ? Theme.green : Theme.textSecondary.opacity(0.3))
+                                                .frame(width: 8, height: 8)
+                                                .shadow(color: isActive ? Theme.green.opacity(0.5) : .clear, radius: 3)
+
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text(displayName(for: server.url))
+                                                    .font(.system(size: 15))
+                                                    .foregroundStyle(isActive ? settingsText : Theme.textSecondary)
+                                                    .lineLimit(1)
+
+                                                Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
+                                                    .font(.system(size: 12, design: .monospaced))
+                                                    .foregroundStyle(Theme.textSecondary)
+                                            }
+
+                                            Spacer()
+
+                                            if isActive {
+                                                ConnectionDot(state: chatService.wsConnectionState)
+                                            }
+                                        }
+                                        .padding(14)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        Button {
+                                            editingIndex = index
+                                            editURL = server.url
+                                            editToken = server.token
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        if !isActive {
+                                            Button(role: .destructive) {
+                                                chatService.removeServer(at: index)
+                                            } label: {
+                                                Label("Remove", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        }
+                    }
+
+                    // MARK: - Agents
+                    if !chatService.agents.isEmpty {
+                        SettingsSection(title: "Agents") {
+                            VStack(spacing: 0) {
+                                ForEach(Array(chatService.agents.enumerated()), id: \.element.id) { index, agent in
+                                    if index > 0 {
+                                        Divider()
+                                            .background(Theme.border)
+                                            .padding(.leading, 16)
+                                    }
+
+                                    let isHidden = chatService.hiddenAgentIds.contains(agent.id)
+
+                                    Button {
+                                        chatService.selectedAgent = agent.id
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            if let emoji = agent.emoji {
+                                                Text(emoji)
+                                                    .font(.system(size: 20))
+                                            }
+                                            Text(agent.name)
+                                                .font(.system(size: 15))
+                                                .foregroundStyle(settingsText)
+
+                                            Spacer()
+
+                                            Button {
+                                                chatService.toggleAgentVisibility(agent.id)
+                                            } label: {
+                                                Image(systemName: isHidden ? "eye.slash" : "eye")
+                                                    .font(.system(size: 15))
+                                                    .foregroundStyle(isHidden ? Theme.textDim : Theme.textSecondary)
+                                                    .frame(width: 32, height: 32)
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(.plain)
+
+                                            if chatService.selectedAgent == agent.id {
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 17))
+                                                    .foregroundStyle(Theme.accent)
+                                            }
+                                        }
+                                        .padding(14)
+                                        .contentShape(Rectangle())
+                                        .opacity(isHidden ? 0.4 : 1.0)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        }
+                    }
+
+                    // MARK: - Notifications
+                    NotificationSettingsSection(cardRadius: cardRadius)
+
                     // MARK: - Quick Join
                     if let roomService {
-                        SettingsSection(title: "Quick Join") {
+                        SettingsSection(title: "Quick Join a Chatroom") {
                             VStack(spacing: 8) {
                                 VStack(spacing: 0) {
                                     HStack(spacing: 10) {
@@ -38,7 +204,7 @@ struct SettingsView: View {
                                             }
                                             TextField("", text: $joinCode)
                                                 .font(.system(size: 15, design: .monospaced))
-                                                .foregroundStyle(Theme.textPrimary)
+                                                .foregroundStyle(settingsText)
                                                 .tint(Theme.accent)
                                                 .autocorrectionDisabled()
                                                 .textInputAutocapitalization(.characters)
@@ -51,7 +217,6 @@ struct SettingsView: View {
                                                 if let room = await roomService.joinWithUniversalCode(joinCode) {
                                                     joinSuccess = true
                                                     joinCode = ""
-                                                    // Brief delay to show success before dismissing
                                                     try? await Task.sleep(nanoseconds: 500_000_000)
                                                     dismiss()
                                                 } else {
@@ -93,141 +258,6 @@ struct SettingsView: View {
                         }
                     }
 
-                    // MARK: - Servers
-                    SettingsSection(title: "Servers") {
-                        Button {
-                            editingIndex = -1
-                            editURL = ""
-                            editToken = ""
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                    } content: {
-                        VStack(spacing: 0) {
-                            ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
-                                let isActive = index == chatService.activeServerIndex
-
-                                if index > 0 {
-                                    Divider()
-                                        .background(Theme.border)
-                                        .padding(.leading, 16)
-                                }
-
-                                Button {
-                                    if !isActive {
-                                        chatService.switchServer(to: index)
-                                    }
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Circle()
-                                            .fill(isActive ? Theme.green : Theme.textSecondary.opacity(0.3))
-                                            .frame(width: 8, height: 8)
-                                            .shadow(color: isActive ? Theme.green.opacity(0.5) : .clear, radius: 3)
-
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(displayName(for: server.url))
-                                                .font(.system(size: 15))
-                                                .foregroundStyle(isActive ? Theme.textPrimary : Theme.textSecondary)
-                                                .lineLimit(1)
-
-                                            Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
-                                                .font(.system(size: 12, design: .monospaced))
-                                                .foregroundStyle(Theme.textSecondary)
-                                        }
-
-                                        Spacer()
-
-                                        if isActive {
-                                            ConnectionDot(state: chatService.wsConnectionState)
-                                        }
-                                    }
-                                    .padding(14)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button {
-                                        editingIndex = index
-                                        editURL = server.url
-                                        editToken = server.token
-                                    } label: {
-                                        Label("Edit", systemImage: "pencil")
-                                    }
-                                    if !isActive {
-                                        Button(role: .destructive) {
-                                            chatService.removeServer(at: index)
-                                        } label: {
-                                            Label("Remove", systemImage: "trash")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .background(Theme.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
-                    }
-
-                    // MARK: - Agents
-                    if !chatService.agents.isEmpty {
-                        SettingsSection(title: "Agents") {
-                            VStack(spacing: 0) {
-                                ForEach(Array(chatService.agents.enumerated()), id: \.element.id) { index, agent in
-                                    if index > 0 {
-                                        Divider()
-                                            .background(Theme.border)
-                                            .padding(.leading, 16)
-                                    }
-
-                                    let isHidden = chatService.hiddenAgentIds.contains(agent.id)
-
-                                    Button {
-                                        chatService.selectedAgent = agent.id
-                                    } label: {
-                                        HStack(spacing: 12) {
-                                            if let emoji = agent.emoji {
-                                                Text(emoji)
-                                                    .font(.system(size: 20))
-                                            }
-                                            Text(agent.name)
-                                                .font(.system(size: 15))
-                                                .foregroundStyle(Theme.textPrimary)
-
-                                            Spacer()
-
-                                            Button {
-                                                chatService.toggleAgentVisibility(agent.id)
-                                            } label: {
-                                                Image(systemName: isHidden ? "eye.slash" : "eye")
-                                                    .font(.system(size: 15))
-                                                    .foregroundStyle(isHidden ? Theme.textDim : Theme.textSecondary)
-                                                    .frame(width: 32, height: 32)
-                                                    .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(.plain)
-
-                                            if chatService.selectedAgent == agent.id {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 17))
-                                                    .foregroundStyle(Theme.accent)
-                                            }
-                                        }
-                                        .padding(14)
-                                        .contentShape(Rectangle())
-                                        .opacity(isHidden ? 0.4 : 1.0)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .background(Theme.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
-                        }
-                    }
-
-                    // MARK: - Notifications
-                    NotificationSettingsSection(cardRadius: cardRadius)
-
                     // MARK: - Claudio Backend (Rooms)
                     if let roomService {
                         ClaudioBackendSection(roomService: roomService, cardRadius: cardRadius)
@@ -244,7 +274,7 @@ struct SettingsView: View {
                                     set: { chatService.selectedAgent = $0 }
                                 ))
                                 .font(Theme.body)
-                                .foregroundStyle(Theme.textPrimary)
+                                .foregroundStyle(settingsText)
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
                             }
@@ -420,7 +450,7 @@ struct SettingsView: View {
 
                     Text("Settings")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(settingsText)
 
                     Spacer()
 
@@ -624,7 +654,7 @@ private struct NotificationSettingsSection: View {
                 HStack {
                     Text("Push Notifications")
                         .font(.system(size: 15))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(settingsText)
                     Spacer()
                     Toggle("", isOn: Binding(
                         get: { notificationService.notificationsEnabled },
@@ -702,7 +732,7 @@ private struct NotificationSettingsSection: View {
         HStack {
             Text(label)
                 .font(.system(size: 15))
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(settingsText)
             Spacer()
             Toggle("", isOn: isOn)
                 .labelsHidden()
@@ -725,6 +755,7 @@ private struct ClaudioBackendSection: View {
     let roomService: RoomService
     let cardRadius: CGFloat
 
+    @State private var isExpanded = false
     @State private var url: String = ""
     @State private var token: String = ""
     @State private var displayName: String = ""
@@ -732,137 +763,152 @@ private struct ClaudioBackendSection: View {
     @State private var showCreateRoom = false
     @State private var showJoinRoom = false
 
+    private var subtitle: String? {
+        if roomService.isConnected { return "Connected" }
+        if roomService.hasBackend { return "Disconnected" }
+        return nil
+    }
+
     var body: some View {
-        SettingsSection(title: "Claudio Backend") {
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: Theme.spacing) {
-                    Text("Server URL")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                    ZStack(alignment: .leading) {
-                        if url.isEmpty {
-                            Text("claudio-server.example.com")
+        VStack(spacing: 8) {
+            DisclosureCard(
+                title: "Claudio Backend",
+                subtitle: subtitle,
+                isExpanded: $isExpanded,
+                cardRadius: cardRadius
+            ) {
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Server URL")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                        ZStack(alignment: .leading) {
+                            if url.isEmpty {
+                                Text("claudio-server.example.com")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                            }
+                            TextField("", text: $url)
                                 .font(.system(size: 15))
-                                .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                                .foregroundStyle(settingsText)
+                                .tint(Theme.accent)
+                                .keyboardType(.URL)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .onChange(of: url) { _, newValue in
+                                    roomService.backendURL = newValue
+                                }
                         }
-                        TextField("", text: $url)
+                    }
+                    .padding(14)
+
+                    Divider().background(Theme.border)
+
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Token (optional)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                        SecureField("Bearer token", text: $token)
                             .font(.system(size: 15))
-                            .foregroundStyle(Theme.textPrimary)
+                            .foregroundStyle(settingsText)
                             .tint(Theme.accent)
-                            .keyboardType(.URL)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
-                            .onChange(of: url) { _, newValue in
-                                roomService.backendURL = newValue
+                            .onChange(of: token) { _, newValue in
+                                roomService.backendToken = newValue
                             }
                     }
-                }
-                .padding(14)
+                    .padding(14)
 
-                Divider().background(Theme.border)
+                    Divider().background(Theme.border)
 
-                VStack(alignment: .leading, spacing: Theme.spacing) {
-                    Text("Token (optional)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                    SecureField("Bearer token", text: $token)
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Display Name")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                        TextField("", text: $displayName, prompt:
+                            Text("Your name in rooms")
+                                .foregroundStyle(Theme.textDim)
+                        )
                         .font(.system(size: 15))
-                        .foregroundStyle(Theme.textPrimary)
+                        .foregroundStyle(settingsText)
                         .tint(Theme.accent)
                         .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: token) { _, newValue in
-                            roomService.backendToken = newValue
+                        .onChange(of: displayName) { _, newValue in
+                            roomService.displayName = newValue
                         }
-                }
-                .padding(14)
-
-                Divider().background(Theme.border)
-
-                VStack(alignment: .leading, spacing: Theme.spacing) {
-                    Text("Display Name")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                    TextField("", text: $displayName, prompt:
-                        Text("Your name in rooms")
-                            .foregroundStyle(Theme.textDim)
-                    )
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.textPrimary)
-                    .tint(Theme.accent)
-                    .autocorrectionDisabled()
-                    .onChange(of: displayName) { _, newValue in
-                        roomService.displayName = newValue
                     }
-                }
-                .padding(14)
+                    .padding(14)
 
-                Divider().background(Theme.border)
+                    Divider().background(Theme.border)
 
-                VStack(alignment: .leading, spacing: Theme.spacing) {
-                    Text("Avatar Emoji")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                    TextField("", text: $avatarEmoji, prompt:
-                        Text("e.g. 😎")
-                            .foregroundStyle(Theme.textDim)
-                    )
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.textPrimary)
-                    .onChange(of: avatarEmoji) { _, newValue in
-                        roomService.avatarEmoji = newValue
+                    VStack(alignment: .leading, spacing: Theme.spacing) {
+                        Text("Avatar Emoji")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textSecondary)
+                        TextField("", text: $avatarEmoji, prompt:
+                            Text("e.g. 😎")
+                                .foregroundStyle(Theme.textDim)
+                        )
+                        .font(.system(size: 15))
+                        .foregroundStyle(settingsText)
+                        .onChange(of: avatarEmoji) { _, newValue in
+                            roomService.avatarEmoji = newValue
+                        }
                     }
-                }
-                .padding(14)
-            }
-            .background(Theme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                    .padding(14)
 
-            if roomService.hasBackend {
-                Button {
-                    if roomService.isConnected {
-                        Task { await roomService.updateProfile() }
-                    } else {
-                        roomService.connect()
-                    }
-                } label: {
-                    Text(roomService.isConnected ? "Update Profile" : "Connect")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Theme.accent)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
+                    if roomService.hasBackend {
+                        Divider().background(Theme.border)
 
-                // Room actions
-                if roomService.isConnected {
-                    HStack(spacing: 8) {
-                        Button { showCreateRoom = true } label: {
-                            Label("Create Room", systemImage: "plus")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                        Button {
+                            if roomService.isConnected {
+                                Task { await roomService.updateProfile() }
+                            } else {
+                                roomService.connect()
+                            }
+                        } label: {
+                            Text(roomService.isConnected ? "Update Profile" : "Connect")
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(Theme.accent)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
 
-                        Button { showJoinRoom = true } label: {
-                            Label("Join Room", systemImage: "link")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundStyle(Theme.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        if roomService.isConnected {
+                            Divider().background(Theme.border)
+
+                            HStack(spacing: 0) {
+                                Button { showCreateRoom = true } label: {
+                                    Label("Create Room", systemImage: "plus")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Theme.accent)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+
+                                Divider().background(Theme.border).frame(height: 20)
+
+                                Button { showJoinRoom = true } label: {
+                                    Label("Join Room", systemImage: "link")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Theme.textSecondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
-                    .padding(.top, 4)
                 }
             }
         }
+        .padding(.horizontal, 16)
         .sheet(isPresented: $showCreateRoom) {
             CreateRoomSheet(roomService: roomService)
         }
@@ -875,6 +921,63 @@ private struct ClaudioBackendSection: View {
             displayName = roomService.displayName
             avatarEmoji = roomService.avatarEmoji
         }
+    }
+}
+
+// MARK: - Disclosure Card
+
+private struct DisclosureCard<Content: View>: View {
+    let title: String
+    let subtitle: String?
+    let cardRadius: CGFloat
+    @Binding var isExpanded: Bool
+    @ViewBuilder let content: Content
+
+    init(title: String, subtitle: String? = nil, isExpanded: Binding<Bool>, cardRadius: CGFloat = 14, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.subtitle = subtitle
+        self._isExpanded = isExpanded
+        self.cardRadius = cardRadius
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(size: 15))
+                            .foregroundStyle(settingsText)
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textDim)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                }
+                .padding(14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Divider().background(Theme.border)
+                content
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
     }
 }
 
