@@ -142,7 +142,9 @@ final class NotificationService {
 
     /// Registers the APNs token with the central push relay so it can send
     /// notifications on behalf of any OpenClaw server.
-    func registerTokenWithRelay(deviceId: String) async {
+    /// When openclawURL and openclawToken are provided, the relay also starts
+    /// a persistent WebSocket connection to listen for agent messages.
+    func registerTokenWithRelay(deviceId: String, openclawURL: String? = nil, openclawToken: String? = nil) async {
         guard let token = apnsToken, !token.isEmpty else {
             log.info("No APNs token available, skipping relay registration")
             return
@@ -156,17 +158,24 @@ final class NotificationService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
 
-        let body: [String: String] = [
+        var body: [String: String] = [
             "deviceId": deviceId,
             "token": token,
             "bundleId": bundleId
         ]
 
+        if let openclawURL, !openclawURL.isEmpty {
+            body["openclawURL"] = openclawURL
+        }
+        if let openclawToken, !openclawToken.isEmpty {
+            body["openclawToken"] = openclawToken
+        }
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (_, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                log.info("APNs token registered with push relay")
+                log.info("APNs token registered with push relay (relay=\(openclawURL != nil))")
             } else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
                 log.error("Push relay registration failed with status \(status)")

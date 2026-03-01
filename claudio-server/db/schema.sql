@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS push_tokens (
     PRIMARY KEY (device_id, bundle_id)
 );
 
+CREATE TABLE IF NOT EXISTS push_watches (
+    device_id    TEXT PRIMARY KEY,
+    openclaw_url TEXT NOT NULL,
+    openclaw_token TEXT NOT NULL,
+    updated_at   DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS invite_codes (
     code TEXT PRIMARY KEY,         -- 8-char alphanumeric
     room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,

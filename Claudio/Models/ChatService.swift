@@ -291,9 +291,14 @@ final class ChatService {
         // Register APNs token if available
         await NotificationService.shared.registerTokenIfNeeded(via: webSocketClient)
 
-        // Register with central push relay
+        // Register with central push relay (include OpenClaw info for DM push)
         let deviceId = DeviceIdentity.shared.deviceId
-        await NotificationService.shared.registerTokenWithRelay(deviceId: deviceId)
+        let server = activeServer
+        await NotificationService.shared.registerTokenWithRelay(
+            deviceId: deviceId,
+            openclawURL: server?.url,
+            openclawToken: server?.token
+        )
     }
 
     @MainActor
