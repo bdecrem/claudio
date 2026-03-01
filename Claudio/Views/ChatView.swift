@@ -93,7 +93,9 @@ struct ChatView: View {
                                     .font(.system(size: 18))
                                     .foregroundStyle(Theme.textSecondary)
                                     .padding(6)
+                                    .hoverEffect(.lift)
                             }
+                            .keyboardShortcut(",", modifiers: .command)
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 14)
@@ -133,6 +135,8 @@ struct ChatView: View {
                                         }
                                     }
                                     .padding(.vertical, 16)
+                                    .frame(maxWidth: 720)
+                                    .frame(maxWidth: .infinity)
                                 }
 
                                 if chatService.isLoading && !hasStreamingMessage {
@@ -294,6 +298,8 @@ struct ChatView: View {
                 }
             }
         }
+        .frame(minWidth: 380, maxWidth: .infinity, minHeight: 500, maxHeight: .infinity)
+        .background(Theme.background)
         .sheet(isPresented: $showSettings) {
             SettingsView(chatService: chatService, roomService: roomService)
         }

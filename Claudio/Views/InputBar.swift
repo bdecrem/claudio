@@ -73,6 +73,7 @@ struct InputBar: View {
                                     .offset(x: 10, y: -10)
                             }
                         }
+                        .hoverEffect(.lift)
                 }
                 .buttonStyle(.plain)
 
@@ -120,6 +121,7 @@ struct InputBar: View {
                         .font(.system(size: voiceSessionActive ? 16 : 20))
                         .frame(width: 44, height: 44)
                         .background(Theme.surface2, in: Circle())
+                        .hoverEffect(.lift)
                 }
 
                 // Send button
@@ -133,6 +135,7 @@ struct InputBar: View {
                         .foregroundStyle(Theme.background)
                         .frame(width: 44, height: 44)
                         .background(Theme.accent, in: Circle())
+                        .hoverEffect(.highlight)
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: text.isEmpty)

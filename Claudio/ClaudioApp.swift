@@ -23,5 +23,7 @@ struct ClaudioApp: App {
                 }
             }
         }
+        .defaultSize(width: 600, height: 820)
+        .windowResizability(.contentSize)
     }
 }
