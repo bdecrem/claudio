@@ -78,9 +78,14 @@ struct ChatEvent {
                         extractedText.append(text)
                     }
                     if obj["type"]?.stringValue == "image",
-                       let source = obj["source"]?.objectValue,
-                       let url = source["url"]?.stringValue, !url.isEmpty {
-                        extractedImages.append(url)
+                       let source = obj["source"]?.objectValue {
+                        if let url = source["url"]?.stringValue, !url.isEmpty {
+                            extractedImages.append(url)
+                        } else if source["type"]?.stringValue == "base64",
+                                  let data = source["data"]?.stringValue, !data.isEmpty {
+                            let mediaType = source["media_type"]?.stringValue ?? "image/png"
+                            extractedImages.append("data:\(mediaType);base64,\(data)")
+                        }
                     }
                     if let audio = Self.extractAudio(from: obj) {
                         extractedAudio.append(audio)
@@ -93,6 +98,9 @@ struct ChatEvent {
                     if let audio = Self.extractAudio(from: obj) {
                         extractedAudio.append(audio)
                     }
+                    if let imgURL = Self.extractImageURL(from: obj) {
+                        extractedImages.append(imgURL)
+                    }
                 }
             }
         }
@@ -103,6 +111,9 @@ struct ChatEvent {
                 if let audio = Self.extractAudio(from: obj) {
                     extractedAudio.append(audio)
                 }
+                if let imgURL = Self.extractImageURL(from: obj) {
+                    extractedImages.append(imgURL)
+                }
             }
         }
 
@@ -112,6 +123,45 @@ struct ChatEvent {
         self.audioAttachments = extractedAudio
 
         self.errorMessage = payload["errorMessage"]?.stringValue
+    }
+
+    /// Extract an image URL from an attachment object (type=image, or has image data/url)
+    private static func extractImageURL(from object: [String: AnyCodableValue]) -> String? {
+        let type = object["type"]?.stringValue?.lowercased()
+        let mimeType = object["mimeType"]?.stringValue ?? object["mime_type"]?.stringValue
+        let isImage = type == "image" || (mimeType?.hasPrefix("image/") == true)
+        guard isImage else { return nil }
+
+        // Direct URL
+        if let url = object["url"]?.stringValue, !url.isEmpty { return url }
+        // Source object (same structure as content blocks)
+        if let source = object["source"]?.objectValue {
+            if let url = source["url"]?.stringValue, !url.isEmpty { return url }
+            if source["type"]?.stringValue == "base64",
+               let data = source["data"]?.stringValue, !data.isEmpty {
+                let mediaType = source["media_type"]?.stringValue ?? mimeType ?? "image/png"
+                return "data:\(mediaType);base64,\(data)"
+            }
+        }
+        // Direct base64 data
+        if let data = object["data"]?.stringValue ?? object["base64"]?.stringValue,
+           !data.isEmpty {
+            let mediaType = mimeType ?? "image/png"
+            return "data:\(mediaType);base64,\(data)"
+        }
+        // MEDIA: path in text field
+        if let text = object["text"]?.stringValue, text.hasPrefix("MEDIA:") {
+            let path = String(text.dropFirst("MEDIA:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let ext = (path as NSString).pathExtension.lowercased()
+            let imageExts: Set<String> = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"]
+            if imageExts.contains(ext) {
+                if let range = path.range(of: ".openclaw/") {
+                    return "/" + path[range.upperBound...]
+                }
+                return path.hasPrefix("/") ? path : "/" + path
+            }
+        }
+        return nil
     }
 
     private static func extractAudio(from object: [String: AnyCodableValue]) -> AudioAttachment? {
@@ -273,9 +323,14 @@ struct HistoryMessage {
                     texts.append(text)
                 }
                 if blockObj["type"]?.stringValue == "image",
-                   let source = blockObj["source"]?.objectValue,
-                   let url = source["url"]?.stringValue, !url.isEmpty {
-                    extractedImages.append(url)
+                   let source = blockObj["source"]?.objectValue {
+                    if let url = source["url"]?.stringValue, !url.isEmpty {
+                        extractedImages.append(url)
+                    } else if source["type"]?.stringValue == "base64",
+                              let data = source["data"]?.stringValue, !data.isEmpty {
+                        let mediaType = source["media_type"]?.stringValue ?? "image/png"
+                        extractedImages.append("data:\(mediaType);base64,\(data)")
+                    }
                 }
             }
             let joined = texts.joined()

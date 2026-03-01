@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CachedMediaImage: View {
-    let relativePath: String
+    let urlString: String
     let serverURL: String
     let token: String
 
@@ -32,10 +32,10 @@ struct CachedMediaImage: View {
                     }
             }
         }
-        .task(id: relativePath) {
+        .task(id: urlString) {
             do {
                 let img = try await MediaImageCache.shared.image(
-                    relativePath: relativePath,
+                    urlString: urlString,
                     serverBaseURL: serverURL,
                     token: token
                 )

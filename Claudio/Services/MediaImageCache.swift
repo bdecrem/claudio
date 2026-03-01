@@ -17,8 +17,17 @@ actor MediaImageCache {
         memoryCache.totalCostLimit = 50 * 1024 * 1024 // 50MB
     }
 
-    func image(relativePath: String, serverBaseURL: String, token: String) async throws -> UIImage {
-        let cacheKey = relativePath as NSString
+    /// Load an image from a URL string. Handles:
+    /// - Data URIs (data:image/png;base64,...)
+    /// - Full HTTP(S) URLs
+    /// - Relative paths (prepended with serverBaseURL)
+    func image(urlString: String, serverBaseURL: String, token: String) async throws -> UIImage {
+        // Data URIs — decode inline, no caching needed
+        if urlString.hasPrefix("data:") {
+            return try decodeDataURI(urlString)
+        }
+
+        let cacheKey = urlString as NSString
 
         // Memory cache
         if let cached = memoryCache.object(forKey: cacheKey) {
@@ -26,40 +35,69 @@ actor MediaImageCache {
         }
 
         // Disk cache
-        let diskFile = diskCacheURL.appendingPathComponent(diskFileName(for: relativePath))
+        let diskFile = diskCacheURL.appendingPathComponent(diskFileName(for: urlString))
         if let data = try? Data(contentsOf: diskFile),
            let img = UIImage(data: data) {
-            let cost = data.count
-            memoryCache.setObject(img, forKey: cacheKey, cost: cost)
+            memoryCache.setObject(img, forKey: cacheKey, cost: data.count)
             return img
         }
 
         // Deduplicate in-flight requests
-        if let existing = inFlightTasks[relativePath] {
+        if let existing = inFlightTasks[urlString] {
             return try await existing.value
         }
 
         let task = Task<UIImage, Error> {
-            let img = try await fetchFromServer(relativePath: relativePath, serverBaseURL: serverBaseURL, token: token)
-            return img
+            try await fetchImage(urlString: urlString, serverBaseURL: serverBaseURL, token: token)
         }
-        inFlightTasks[relativePath] = task
+        inFlightTasks[urlString] = task
 
         do {
             let img = try await task.value
-            inFlightTasks[relativePath] = nil
+            inFlightTasks[urlString] = nil
             return img
         } catch {
-            inFlightTasks[relativePath] = nil
+            inFlightTasks[urlString] = nil
             throw error
         }
     }
 
-    private func fetchFromServer(relativePath: String, serverBaseURL: String, token: String) async throws -> UIImage {
-        let urlString = serverBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + relativePath
-        guard let url = URL(string: urlString) else {
+    // MARK: - Data URI
+
+    private func decodeDataURI(_ uri: String) throws -> UIImage {
+        // Format: data:image/png;base64,iVBOR...
+        guard let commaIndex = uri.firstIndex(of: ",") else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        let base64String = String(uri[uri.index(after: commaIndex)...])
+        guard let data = Data(base64Encoded: base64String),
+              let img = UIImage(data: data) else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        log.info("Decoded data URI image (\(data.count) bytes)")
+        return img
+    }
+
+    // MARK: - Network Fetch
+
+    private func fetchImage(urlString: String, serverBaseURL: String, token: String) async throws -> UIImage {
+        // Build the full URL
+        let fullURLString: String
+        if urlString.hasPrefix("http://") || urlString.hasPrefix("https://") {
+            fullURLString = urlString
+        } else {
+            // Relative path — prepend server base URL
+            let base = serverBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let path = urlString.hasPrefix("/") ? urlString : "/\(urlString)"
+            fullURLString = base + path
+        }
+
+        guard let url = URL(string: fullURLString) else {
+            log.error("Bad image URL: \(fullURLString)")
             throw URLError(.badURL)
         }
+
+        log.info("Fetching image: \(fullURLString)")
 
         var request = URLRequest(url: url)
         request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
@@ -69,24 +107,29 @@ actor MediaImageCache {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            log.error("Image fetch failed: HTTP \(httpResponse.statusCode) for \(fullURLString)")
             throw URLError(.badServerResponse)
         }
 
         guard let img = UIImage(data: data) else {
+            let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
+            log.error("Cannot decode image data (\(data.count) bytes, content-type: \(contentType))")
             throw URLError(.cannotDecodeContentData)
         }
 
-        // Cache to memory
-        let cacheKey = relativePath as NSString
+        // Cache to memory + disk
+        let cacheKey = urlString as NSString
         memoryCache.setObject(img, forKey: cacheKey, cost: data.count)
 
-        // Cache to disk
-        let diskFile = diskCacheURL.appendingPathComponent(diskFileName(for: relativePath))
+        let diskFile = diskCacheURL.appendingPathComponent(diskFileName(for: urlString))
         try? data.write(to: diskFile, options: .atomic)
 
-        log.info("Fetched image: \(relativePath) (\(data.count) bytes)")
+        log.info("Cached image: \(urlString) (\(data.count) bytes)")
         return img
     }
 

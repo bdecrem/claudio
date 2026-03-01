@@ -57,7 +57,7 @@ struct MessageBubble: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(message.imageURLs, id: \.self) { url in
                         CachedMediaImage(
-                            relativePath: url,
+                            urlString: url,
                             serverURL: serverURL,
                             token: serverToken
                         )
