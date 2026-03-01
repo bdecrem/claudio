@@ -50,6 +50,15 @@ CREATE INDEX IF NOT EXISTS idx_messages_room_created ON messages(room_id, create
 CREATE INDEX IF NOT EXISTS idx_participants_room ON participants(room_id);
 CREATE INDEX IF NOT EXISTS idx_participants_user ON participants(user_id);
 
+CREATE TABLE IF NOT EXISTS push_tokens (
+    device_id TEXT NOT NULL,
+    token     TEXT NOT NULL,
+    bundle_id TEXT NOT NULL DEFAULT 'com.kochito.claudio',
+    platform  TEXT NOT NULL DEFAULT 'ios',
+    updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (device_id, bundle_id)
+);
+
 CREATE TABLE IF NOT EXISTS invite_codes (
     code TEXT PRIMARY KEY,         -- 8-char alphanumeric
     room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
