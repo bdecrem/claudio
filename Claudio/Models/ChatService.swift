@@ -340,7 +340,8 @@ final class ChatService {
                     return Message(
                         role: role,
                         content: msg.content,
-                        timestamp: msg.timestamp ?? Date()
+                        timestamp: msg.timestamp ?? Date(),
+                        imageURLs: msg.imageURLs
                     )
                 }
                 persistChatHistories()
@@ -387,15 +388,20 @@ final class ChatService {
 
         switch event.state {
         case .delta:
-            guard let text = event.text else { return }
+            guard event.text != nil || !event.imageURLs.isEmpty else { return }
+            let text = event.text ?? ""
 
             if let msgId = streamingMessageId,
                let idx = messages.firstIndex(where: { $0.id == msgId }) {
                 // Update existing streaming message — delta contains FULL text so far
                 messages[idx].content = text
+                if !event.imageURLs.isEmpty {
+                    let existing = Set(messages[idx].imageURLs)
+                    messages[idx].imageURLs += event.imageURLs.filter { !existing.contains($0) }
+                }
             } else {
                 // First delta — create streaming placeholder
-                let placeholder = Message(role: .assistant, content: text, isStreaming: true)
+                let placeholder = Message(role: .assistant, content: text, isStreaming: true, imageURLs: event.imageURLs)
                 messages.append(placeholder)
                 streamingMessageId = placeholder.id
             }
@@ -407,9 +413,13 @@ final class ChatService {
                let idx = messages.firstIndex(where: { $0.id == msgId }) {
                 messages[idx].content = finalText
                 messages[idx].isStreaming = false
+                if !event.imageURLs.isEmpty {
+                    let existing = Set(messages[idx].imageURLs)
+                    messages[idx].imageURLs += event.imageURLs.filter { !existing.contains($0) }
+                }
             } else {
                 // Got final without any deltas
-                messages.append(Message(role: .assistant, content: finalText))
+                messages.append(Message(role: .assistant, content: finalText, imageURLs: event.imageURLs))
             }
 
             let compositeId = selectedAgent
@@ -535,6 +545,10 @@ final class ChatService {
                let msgIdx = messages.firstIndex(where: { $0.id == msgId }),
                let tcIdx = messages[msgIdx].toolCalls.firstIndex(where: { $0.id == callId }) {
                 messages[msgIdx].toolCalls[tcIdx].output = event.meta ?? (event.isError ? "error" : "done")
+                // Append image URL from MEDIA: output if present
+                if let imageURL = event.imageRelativeURL {
+                    messages[msgIdx].imageURLs.append(imageURL)
+                }
             }
 
         default:
@@ -622,6 +636,12 @@ final class ChatService {
         }
         let data = queuedVoiceReplyAudio.removeFirst()
         _ = await playAudioData(data, source: "voice-reply-mp3")
+    }
+
+    /// HTTP base URL for the active server (converts ws(s):// to http(s)://)
+    var httpBaseURL: String {
+        guard let server = activeServer else { return "" }
+        return httpURL(for: server.url)
     }
 
     /// Convert ws:// or wss:// URLs to http:// or https:// for HTTP endpoints (TTS)

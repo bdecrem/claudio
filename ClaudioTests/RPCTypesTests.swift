@@ -201,4 +201,117 @@ final class RPCTypesTests: XCTestCase {
         ])
         XCTAssertNil(WSAgent(from: value))
     }
+
+    // MARK: - ChatEvent Image Content Blocks
+
+    func testChatEventImageContentBlock() {
+        let payload: [String: AnyCodableValue] = [
+            "sessionKey": .string("s"),
+            "runId": .string("r"),
+            "state": .string("delta"),
+            "message": .object([
+                "content": .array([
+                    .object(["type": .string("text"), "text": .string("Here's the screenshot:")]),
+                    .object([
+                        "type": .string("image"),
+                        "source": .object(["url": .string("/media/browser/abc123.png")])
+                    ])
+                ])
+            ])
+        ]
+        let event = ChatEvent(from: payload)
+        XCTAssertNotNil(event)
+        XCTAssertEqual(event?.text, "Here's the screenshot:")
+        XCTAssertEqual(event?.imageURLs, ["/media/browser/abc123.png"])
+    }
+
+    func testChatEventImageOnly() {
+        let payload: [String: AnyCodableValue] = [
+            "sessionKey": .string("s"),
+            "runId": .string("r"),
+            "state": .string("delta"),
+            "message": .object([
+                "content": .array([
+                    .object([
+                        "type": .string("image"),
+                        "source": .object(["url": .string("/media/screenshot.jpg")])
+                    ])
+                ])
+            ])
+        ]
+        let event = ChatEvent(from: payload)
+        XCTAssertNotNil(event)
+        XCTAssertNil(event?.text)
+        XCTAssertEqual(event?.imageURLs, ["/media/screenshot.jpg"])
+    }
+
+    // MARK: - AgentEvent MEDIA: Image Path
+
+    func testAgentEventMediaImagePath() {
+        let payload: [String: AnyCodableValue] = [
+            "sessionKey": .string("s"),
+            "runId": .string("r"),
+            "stream": .string("tool"),
+            "data": .object([
+                "phase": .string("result"),
+                "toolCallId": .string("tc1"),
+                "output": .string("MEDIA:/home/user/.openclaw/media/browser/shot123.jpg"),
+            ])
+        ]
+        let event = AgentEvent(from: payload)
+        XCTAssertNotNil(event)
+        XCTAssertEqual(event?.output, "MEDIA:/home/user/.openclaw/media/browser/shot123.jpg")
+        XCTAssertEqual(event?.imageRelativeURL, "/media/browser/shot123.jpg")
+    }
+
+    func testAgentEventMediaNonImage() {
+        let payload: [String: AnyCodableValue] = [
+            "sessionKey": .string("s"),
+            "runId": .string("r"),
+            "stream": .string("tool"),
+            "data": .object([
+                "phase": .string("result"),
+                "toolCallId": .string("tc1"),
+                "output": .string("MEDIA:/home/user/.openclaw/media/audio/voice.mp3"),
+            ])
+        ]
+        let event = AgentEvent(from: payload)
+        XCTAssertNotNil(event)
+        XCTAssertNil(event?.imageRelativeURL)
+    }
+
+    // MARK: - HistoryMessage with Images
+
+    func testHistoryMessageWithImages() {
+        let value = AnyCodableValue.object([
+            "role": .string("assistant"),
+            "content": .array([
+                .object(["type": .string("text"), "text": .string("Here you go:")]),
+                .object([
+                    "type": .string("image"),
+                    "source": .object(["url": .string("/media/gen/img001.png")])
+                ])
+            ])
+        ])
+        let msg = HistoryMessage(from: value)
+        XCTAssertNotNil(msg)
+        XCTAssertEqual(msg?.content, "Here you go:")
+        XCTAssertEqual(msg?.imageURLs, ["/media/gen/img001.png"])
+    }
+
+    func testHistoryMessageImageOnlyNotSkipped() {
+        let value = AnyCodableValue.object([
+            "role": .string("assistant"),
+            "content": .array([
+                .object([
+                    "type": .string("image"),
+                    "source": .object(["url": .string("/media/screenshot.png")])
+                ])
+            ])
+        ])
+        let msg = HistoryMessage(from: value)
+        XCTAssertNotNil(msg)
+        XCTAssertEqual(msg?.content, "")
+        XCTAssertEqual(msg?.imageURLs, ["/media/screenshot.png"])
+    }
 }

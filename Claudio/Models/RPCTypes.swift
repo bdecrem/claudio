@@ -38,6 +38,7 @@ struct ChatEvent {
     let runId: String
     let state: ChatEventState
     let text: String?
+    let imageURLs: [String]
     let audioAttachments: [AudioAttachment]
     let errorMessage: String?
 
@@ -66,6 +67,7 @@ struct ChatEvent {
         self.state = state
 
         var extractedText: [String] = []
+        var extractedImages: [String] = []
         var extractedAudio: [AudioAttachment] = []
 
         if let message = payload["message"]?.objectValue {
@@ -74,6 +76,11 @@ struct ChatEvent {
                     guard let obj = block.objectValue else { continue }
                     if let text = obj["text"]?.stringValue, !text.isEmpty {
                         extractedText.append(text)
+                    }
+                    if obj["type"]?.stringValue == "image",
+                       let source = obj["source"]?.objectValue,
+                       let url = source["url"]?.stringValue, !url.isEmpty {
+                        extractedImages.append(url)
                     }
                     if let audio = Self.extractAudio(from: obj) {
                         extractedAudio.append(audio)
@@ -101,6 +108,7 @@ struct ChatEvent {
 
         let joinedText = extractedText.joined()
         self.text = joinedText.isEmpty ? nil : joinedText
+        self.imageURLs = extractedImages
         self.audioAttachments = extractedAudio
 
         self.errorMessage = payload["errorMessage"]?.stringValue
@@ -173,7 +181,25 @@ struct AgentEvent {
     let toolName: String?
     let args: [String: String]?
     let meta: String?         // tool result summary (e.g. the command that ran)
+    let output: String?       // raw tool output
     let isError: Bool
+
+    private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"]
+
+    /// If output starts with MEDIA: and ends with an image extension, return the relative URL
+    var imageRelativeURL: String? {
+        guard let output, output.hasPrefix("MEDIA:") else { return nil }
+        let path = String(output.dropFirst("MEDIA:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        let ext = (path as NSString).pathExtension.lowercased()
+        guard Self.imageExtensions.contains(ext) else { return nil }
+        // Strip everything up to and including .openclaw/ to get the relative path
+        if let range = path.range(of: ".openclaw/") {
+            return "/" + path[range.upperBound...]
+        }
+        // If no .openclaw/ prefix, use the path as-is (may already be relative)
+        if path.hasPrefix("/") { return path }
+        return "/" + path
+    }
 
     init?(from payload: [String: AnyCodableValue]?) {
         guard let payload,
@@ -189,6 +215,7 @@ struct AgentEvent {
         self.toolName = data["name"]?.stringValue
         self.isError = data["isError"]?.boolValue ?? false
         self.meta = data["meta"]?.stringValue
+        self.output = data["output"]?.stringValue
 
         // Parse args — flatten to [String: String] for display
         if let argsObj = data["args"]?.objectValue {
@@ -224,32 +251,43 @@ struct ConnectClient: Encodable {
 struct HistoryMessage {
     let role: String
     let content: String
+    let imageURLs: [String]
     let timestamp: Date?
 
     init?(from value: AnyCodableValue) {
         guard let obj = value.objectValue,
               let role = obj["role"]?.stringValue else { return nil }
 
+        var extractedImages: [String] = []
+
         // content can be a plain string or an array of content blocks
         if let contentStr = obj["content"]?.stringValue {
             self.content = contentStr
         } else if let contentArr = obj["content"]?.arrayValue {
-            // Extract text from content blocks: [{type:"text", text:"..."}, ...]
-            let texts = contentArr.compactMap { block -> String? in
-                guard let blockObj = block.objectValue,
-                      blockObj["type"]?.stringValue == "text",
-                      let text = blockObj["text"]?.stringValue else { return nil }
-                return text
+            // Extract text and images from content blocks
+            var texts: [String] = []
+            for block in contentArr {
+                guard let blockObj = block.objectValue else { continue }
+                if blockObj["type"]?.stringValue == "text",
+                   let text = blockObj["text"]?.stringValue {
+                    texts.append(text)
+                }
+                if blockObj["type"]?.stringValue == "image",
+                   let source = blockObj["source"]?.objectValue,
+                   let url = source["url"]?.stringValue, !url.isEmpty {
+                    extractedImages.append(url)
+                }
             }
             let joined = texts.joined()
-            // Skip messages with no text content (e.g. only thinking blocks)
-            guard !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            // Skip messages with no text and no images
+            guard !joined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !extractedImages.isEmpty else { return nil }
             self.content = joined.trimmingCharacters(in: .newlines)
         } else {
             return nil
         }
 
         self.role = role
+        self.imageURLs = extractedImages
         if let ts = obj["timestamp"]?.doubleValue {
             self.timestamp = Date(timeIntervalSince1970: ts / 1000.0)
         } else {

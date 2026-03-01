@@ -45,6 +45,8 @@
 		G10000010000000000000009 /* JoinRoomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000009 /* JoinRoomSheet.swift */; };
 		G1000001000000000000000A /* AddAgentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = G2000001000000000000000A /* AddAgentSheet.swift */; };
 		G1000001000000000000000B /* MentionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = G2000001000000000000000B /* MentionOverlay.swift */; };
+		M10000010000000000000001 /* MediaImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000010000000000000001 /* MediaImageCache.swift */; };
+		K10000010000000000000001 /* CachedMediaImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = K20000010000000000000001 /* CachedMediaImage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +92,8 @@
 		G20000010000000000000009 /* JoinRoomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoinRoomSheet.swift; sourceTree = "<group>"; };
 		G2000001000000000000000A /* AddAgentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAgentSheet.swift; sourceTree = "<group>"; };
 		G2000001000000000000000B /* MentionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlay.swift; sourceTree = "<group>"; };
+		M20000010000000000000001 /* MediaImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImageCache.swift; sourceTree = "<group>"; };
+		K20000010000000000000001 /* CachedMediaImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedMediaImage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -177,6 +181,7 @@
 				G20000010000000000000009 /* JoinRoomSheet.swift */,
 				G2000001000000000000000A /* AddAgentSheet.swift */,
 				G2000001000000000000000B /* MentionOverlay.swift */,
+				K20000010000000000000001 /* CachedMediaImage.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -194,6 +199,7 @@
 				N20000010000000000000002 /* AppDelegate.swift */,
 				G20000010000000000000002 /* RoomService.swift */,
 				J20000010000000000000001 /* JoinCodeDecoder.swift */,
+				M20000010000000000000001 /* MediaImageCache.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -362,6 +368,8 @@
 				G1000001000000000000000A /* AddAgentSheet.swift in Sources */,
 				G1000001000000000000000B /* MentionOverlay.swift in Sources */,
 				J10000010000000000000001 /* JoinCodeDecoder.swift in Sources */,
+				M10000010000000000000001 /* MediaImageCache.swift in Sources */,
+				K10000010000000000000001 /* CachedMediaImage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

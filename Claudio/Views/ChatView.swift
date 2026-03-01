@@ -128,7 +128,9 @@ struct ChatView: View {
                                         ForEach(chatService.messages) { message in
                                             MessageBubble(
                                                 message: message,
-                                                agentName: message.role == .assistant ? currentAgentName : ""
+                                                agentName: message.role == .assistant ? currentAgentName : "",
+                                                serverURL: chatService.httpBaseURL,
+                                                serverToken: chatService.selectedServer?.token ?? ""
                                             )
                                             .id(message.id)
                                             .padding(.bottom, 12)

@@ -15,6 +15,7 @@ struct Message: Identifiable, Equatable {
     var isStreaming: Bool
     var toolCalls: [ToolCall]
     var imageAttachments: [ImageAttachment]
+    var imageURLs: [String]
 
     // Room message identity (nil for 1-on-1 chats)
     var senderId: String?
@@ -29,7 +30,7 @@ struct Message: Identifiable, Equatable {
         case system
     }
 
-    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = [], imageAttachments: [ImageAttachment] = [], senderId: String? = nil, senderDisplayName: String? = nil, senderEmoji: String? = nil, mentions: [String]? = nil, replyToId: String? = nil) {
+    init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date(), isStreaming: Bool = false, toolCalls: [ToolCall] = [], imageAttachments: [ImageAttachment] = [], imageURLs: [String] = [], senderId: String? = nil, senderDisplayName: String? = nil, senderEmoji: String? = nil, mentions: [String]? = nil, replyToId: String? = nil) {
         self.id = id
         self.role = role
         self.content = content
@@ -37,6 +38,7 @@ struct Message: Identifiable, Equatable {
         self.isStreaming = isStreaming
         self.toolCalls = toolCalls
         self.imageAttachments = imageAttachments
+        self.imageURLs = imageURLs
         self.senderId = senderId
         self.senderDisplayName = senderDisplayName
         self.senderEmoji = senderEmoji
@@ -63,7 +65,7 @@ struct ToolCall: Identifiable, Equatable {
 
 extension Message: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, role, content, timestamp
+        case id, role, content, timestamp, imageURLs
         case senderId, senderDisplayName, senderEmoji, mentions, replyToId
     }
 
@@ -76,6 +78,7 @@ extension Message: Codable {
         isStreaming = false
         toolCalls = []
         imageAttachments = []
+        imageURLs = try container.decodeIfPresent([String].self, forKey: .imageURLs) ?? []
         senderId = try container.decodeIfPresent(String.self, forKey: .senderId)
         senderDisplayName = try container.decodeIfPresent(String.self, forKey: .senderDisplayName)
         senderEmoji = try container.decodeIfPresent(String.self, forKey: .senderEmoji)
@@ -89,6 +92,9 @@ extension Message: Codable {
         try container.encode(role, forKey: .role)
         try container.encode(content, forKey: .content)
         try container.encode(timestamp, forKey: .timestamp)
+        if !imageURLs.isEmpty {
+            try container.encode(imageURLs, forKey: .imageURLs)
+        }
         try container.encodeIfPresent(senderId, forKey: .senderId)
         try container.encodeIfPresent(senderDisplayName, forKey: .senderDisplayName)
         try container.encodeIfPresent(senderEmoji, forKey: .senderEmoji)

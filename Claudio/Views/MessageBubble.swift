@@ -3,6 +3,8 @@ import SwiftUI
 struct MessageBubble: View {
     let message: Message
     var agentName: String = ""
+    var serverURL: String = ""
+    var serverToken: String = ""
 
     var body: some View {
         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 2) {
@@ -50,6 +52,20 @@ struct MessageBubble: View {
                 }
             }
 
+            // Server images (from imageURLs)
+            if !message.imageURLs.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(message.imageURLs, id: \.self) { url in
+                        CachedMediaImage(
+                            relativePath: url,
+                            serverURL: serverURL,
+                            token: serverToken
+                        )
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+
             // Bubble
             HStack {
                 if message.role == .user { Spacer(minLength: 60) }
@@ -72,9 +88,9 @@ struct MessageBubble: View {
                 .padding(.vertical, 10)
                 .background(bubbleBackground)
                 .overlay(bubbleOverlay)
-                // Hide empty bubble when only tool calls are showing
-                .opacity(message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty ? 0 : 1)
-                .frame(height: message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty ? 0 : nil)
+                // Hide empty bubble when only tool calls or images are showing
+                .opacity(message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty && message.imageURLs.isEmpty ? 0 : 1)
+                .frame(height: message.content.isEmpty && !message.isStreaming && message.imageAttachments.isEmpty && message.imageURLs.isEmpty ? 0 : nil)
 
                 if message.role == .assistant { Spacer(minLength: 60) }
             }
