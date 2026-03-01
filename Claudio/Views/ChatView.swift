@@ -189,6 +189,7 @@ struct ChatView: View {
                                     .id("loading")
                                 }
                             }
+                            .scrollDismissesKeyboard(.interactively)
                             .defaultScrollAnchor(.bottom)
                             .onChange(of: chatService.messages.count) {
                                 scrollToBottom(proxy: proxy)
