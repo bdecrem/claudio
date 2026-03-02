@@ -100,13 +100,14 @@ struct ChatView: View {
                             .contextMenu {
                                 if chatService.savedServers.count > 1 {
                                     ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
+                                        let name = server.nickname.isEmpty ? serverDisplayName(for: server.url) : server.nickname
                                         Button {
                                             chatService.switchServer(to: index)
                                         } label: {
                                             if index == chatService.activeServerIndex {
-                                                Label(serverDisplayName(for: server.url), systemImage: "checkmark")
+                                                Label(name, systemImage: "checkmark")
                                             } else {
-                                                Text(serverDisplayName(for: server.url))
+                                                Text(name)
                                             }
                                         }
                                     }

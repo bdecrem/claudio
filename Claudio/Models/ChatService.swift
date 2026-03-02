@@ -35,6 +35,7 @@ final class ChatService {
     struct Server: Equatable {
         var url: String
         var token: String
+        var nickname: String = ""
     }
 
     /// All saved servers (persisted as JSON in UserDefaults)
@@ -126,7 +127,7 @@ final class ChatService {
                    !url.hasPrefix("ws://") && !url.hasPrefix("wss://") {
                     url = "https://\(url)"
                 }
-                return Server(url: url, token: server.token)
+                return Server(url: url, token: server.token, nickname: server.nickname ?? "")
             }
         } else {
             self.savedServers = []
@@ -155,14 +156,14 @@ final class ChatService {
            !cleaned.hasPrefix("ws://") && !cleaned.hasPrefix("wss://") {
             cleaned = "https://\(cleaned)"
         }
-        savedServers.append(Server(url: cleaned, token: token))
+        savedServers.append(Server(url: cleaned, token: token, nickname: ""))
         if savedServers.count == 1 {
             activeServerIndex = 0
         }
         connectWebSocket()
     }
 
-    func updateServer(at index: Int, url: String, token: String) {
+    func updateServer(at index: Int, url: String, token: String, nickname: String = "") {
         guard savedServers.indices.contains(index) else { return }
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
@@ -172,7 +173,8 @@ final class ChatService {
         }
         savedServers[index] = Server(
             url: cleaned,
-            token: token
+            token: token,
+            nickname: nickname
         )
         if index == activeServerIndex {
             connectWebSocket()
@@ -847,7 +849,7 @@ final class ChatService {
     }
 
     private func persistServers() {
-        let codable = savedServers.map { CodableServer(url: $0.url, token: $0.token) }
+        let codable = savedServers.map { CodableServer(url: $0.url, token: $0.token, nickname: $0.nickname) }
         if let data = try? JSONEncoder().encode(codable) {
             UserDefaults.standard.set(data, forKey: "savedServers")
         }
@@ -859,6 +861,7 @@ final class ChatService {
 private struct CodableServer: Codable {
     let url: String
     let token: String
+    var nickname: String?
 }
 
 private struct CodableChatState: Codable {

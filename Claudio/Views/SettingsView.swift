@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var editingIndex: Int?
     @State private var editURL = ""
     @State private var editToken = ""
+    @State private var editNickname = ""
     @State private var joinCode = ""
     @State private var isJoining = false
     @State private var joinError: String?
@@ -34,6 +35,7 @@ struct SettingsView: View {
                                 editingIndex = -1
                                 editURL = ""
                                 editToken = ""
+                                editNickname = ""
                             } label: {
                                 VStack(spacing: 10) {
                                     Image(systemName: "plus")
@@ -88,12 +90,12 @@ struct SettingsView: View {
                                                 .shadow(color: isActive ? Theme.green.opacity(0.5) : .clear, radius: 3)
 
                                             VStack(alignment: .leading, spacing: 1) {
-                                                Text(displayName(for: server.url))
+                                                Text(server.nickname.isEmpty ? displayName(for: server.url) : server.nickname)
                                                     .font(.system(size: 15))
                                                     .foregroundStyle(isActive ? settingsText : Theme.textSecondary)
                                                     .lineLimit(1)
 
-                                                Text(server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))")
+                                                Text(server.nickname.isEmpty ? (server.token.isEmpty ? "No token" : "Bearer ••••\(String(server.token.suffix(4)))") : displayName(for: server.url))
                                                     .font(.system(size: 12, design: .monospaced))
                                                     .foregroundStyle(Theme.textSecondary)
                                             }
@@ -113,6 +115,7 @@ struct SettingsView: View {
                                             editingIndex = index
                                             editURL = server.url
                                             editToken = server.token
+                                            editNickname = server.nickname
                                         } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
@@ -475,11 +478,12 @@ struct SettingsView: View {
                     isNew: index == -1,
                     url: $editURL,
                     token: $editToken,
+                    nickname: $editNickname,
                     onSave: {
                         if index == -1 {
                             chatService.addServer(url: editURL, token: editToken)
                         } else {
-                            chatService.updateServer(at: index, url: editURL, token: editToken)
+                            chatService.updateServer(at: index, url: editURL, token: editToken, nickname: editNickname)
                         }
                         editingIndex = nil
                     },
@@ -566,6 +570,7 @@ private struct ServerEditSheet: View {
     let isNew: Bool
     @Binding var url: String
     @Binding var token: String
+    @Binding var nickname: String
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -573,6 +578,30 @@ private struct ServerEditSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
+                    if !isNew {
+                        VStack(alignment: .leading, spacing: Theme.spacing) {
+                            Text("Nickname")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.textSecondary)
+                            ZStack(alignment: .leading) {
+                                if nickname.isEmpty {
+                                    Text("e.g. Home, Work")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                                }
+                                TextField("", text: $nickname)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .tint(Theme.accent)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.words)
+                            }
+                        }
+                        .padding(14)
+
+                        Divider().background(Theme.border)
+                    }
+
                     VStack(alignment: .leading, spacing: Theme.spacing) {
                         Text("Server URL")
                             .font(.system(size: 12))
