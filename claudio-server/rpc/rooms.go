@@ -24,6 +24,20 @@ func (r *Router) handleRoomsList(client *ws.Client, req ws.RPCRequest) {
 	}))
 }
 
+func (r *Router) handleRoomsListPublic(client *ws.Client, req ws.RPCRequest) {
+	rooms, err := r.DB.ListPublicRooms()
+	if err != nil {
+		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
+		return
+	}
+	if rooms == nil {
+		rooms = []db.Room{}
+	}
+	client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
+		"rooms": rooms,
+	}))
+}
+
 func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 	name := jsonString(req.Params["name"])
 	emoji := jsonString(req.Params["emoji"])
@@ -33,7 +47,7 @@ func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	room, err := r.DB.CreateRoom(name, emoji, client.UserID())
+	room, err := r.DB.CreateRoom(name, emoji, client.UserID(), false)
 	if err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return
@@ -62,9 +76,58 @@ func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 }
 
 func (r *Router) handleRoomsJoin(client *ws.Client, req ws.RPCRequest) {
+	roomID := jsonString(req.Params["roomId"])
 	code := jsonString(req.Params["inviteCode"])
+
+	if roomID != "" {
+		// Join by roomId — must be a public room
+		isPublic, err := r.DB.IsRoomPublic(roomID)
+		if err != nil {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "NOT_FOUND", "Room not found"))
+			return
+		}
+		if !isPublic {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Room is not public"))
+			return
+		}
+
+		if client.IsGuest() {
+			// Guests just subscribe, no participant record
+			r.Hub.SubscribeRoom(roomID, client)
+		} else {
+			// Authenticated user: add as participant
+			already, _ := r.DB.IsParticipant(roomID, client.UserID())
+			if !already {
+				if err := r.DB.AddParticipant(roomID, client.UserID(), "member"); err != nil {
+					client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
+					return
+				}
+				user, _ := r.DB.GetUser(client.UserID())
+				if user != nil {
+					r.Hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+						"roomId":      roomID,
+						"displayName": user.DisplayName,
+						"emoji":       user.AvatarEmoji,
+						"userId":      user.ID,
+					}), nil)
+				}
+			}
+			r.Hub.SubscribeRoom(roomID, client)
+		}
+
+		room, err := r.DB.GetRoom(roomID)
+		if err != nil {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
+			return
+		}
+		client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
+			"room": room,
+		}))
+		return
+	}
+
 	if code == "" {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "INVALID_PARAMS", "inviteCode is required"))
+		client.SendJSON(ws.NewErrorResponse(req.ID, "INVALID_PARAMS", "roomId or inviteCode is required"))
 		return
 	}
 
@@ -144,11 +207,19 @@ func (r *Router) handleRoomsInfo(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Verify participant
-	ok, _ := r.DB.IsParticipant(roomID, client.UserID())
-	if !ok {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
-		return
+	// Verify access
+	if client.IsGuest() {
+		isPublic, _ := r.DB.IsRoomPublic(roomID)
+		if !isPublic {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access public rooms"))
+			return
+		}
+	} else {
+		ok, _ := r.DB.IsParticipant(roomID, client.UserID())
+		if !ok {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
+			return
+		}
 	}
 
 	room, err := r.DB.GetRoom(roomID)
@@ -189,8 +260,12 @@ func (r *Router) handleRoomsAddAgent(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 	if role != "owner" && role != "admin" {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Only owners and admins can add agents"))
-		return
+		// In public rooms, members can also add agents
+		isPublic, _ := r.DB.IsRoomPublic(roomID)
+		if !isPublic {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Only owners and admins can add agents"))
+			return
+		}
 	}
 
 	if agentName == "" {

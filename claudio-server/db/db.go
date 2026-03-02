@@ -27,6 +27,9 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
 
+	// Migrations: add columns that may not exist on older DBs
+	sqlDB.Exec("ALTER TABLE rooms ADD COLUMN public BOOLEAN NOT NULL DEFAULT 0")
+
 	slog.Info("database opened", "path", path)
 	return &DB{sqlDB}, nil
 }

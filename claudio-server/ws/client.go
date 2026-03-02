@@ -27,6 +27,7 @@ type Client struct {
 	// Auth state
 	challengeNonce string
 	authenticated  bool
+	isGuest        bool
 	displayName    string
 }
 
@@ -57,11 +58,26 @@ func (c *Client) DisplayName() string {
 	return c.displayName
 }
 
+func (c *Client) IsGuest() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isGuest
+}
+
 func (c *Client) SetAuth(userID, displayName string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.userID = userID
 	c.authenticated = true
+	c.displayName = displayName
+}
+
+func (c *Client) SetGuestAuth(guestID, displayName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.userID = guestID
+	c.authenticated = true
+	c.isGuest = true
 	c.displayName = displayName
 }
 

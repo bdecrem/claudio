@@ -24,9 +24,22 @@ func NewRouter(hub *ws.Hub, database *db.DB) *Router {
 func (r *Router) Handle(client *ws.Client, req ws.RPCRequest) {
 	slog.Info("RPC", "method", req.Method, "userID", client.UserID())
 
+	// Guest permission gate
+	if client.IsGuest() {
+		switch req.Method {
+		case "rooms.listPublic", "rooms.join", "rooms.send", "rooms.history", "rooms.info":
+			// allowed — fall through
+		default:
+			client.SendJSON(ws.NewErrorResponse(req.ID, "GUEST_FORBIDDEN", "Guests cannot use "+req.Method))
+			return
+		}
+	}
+
 	switch req.Method {
 	case "rooms.list":
 		r.handleRoomsList(client, req)
+	case "rooms.listPublic":
+		r.handleRoomsListPublic(client, req)
 	case "rooms.create":
 		r.handleRoomsCreate(client, req)
 	case "rooms.join":
