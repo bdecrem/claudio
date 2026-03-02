@@ -40,6 +40,9 @@ final class NotificationService {
         didSet { UserDefaults.standard.set(hasPromptedForNotifications, forKey: "hasPromptedForNotifications") }
     }
 
+    /// Pending relay registration params, stored when token isn't available yet.
+    private var pendingRelayParams: (deviceId: String, openclawURL: String?, openclawToken: String?)?
+
     private init() {
         self.notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
         self.notifyAgentMessages = UserDefaults.standard.object(forKey: "notifyAgentMessages") as? Bool ?? true
@@ -100,6 +103,18 @@ final class NotificationService {
         let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
         apnsToken = hex
         log.info("APNs token: \(hex.prefix(8))...")
+
+        // If relay registration was attempted before the token arrived, retry now
+        if let params = pendingRelayParams {
+            pendingRelayParams = nil
+            Task {
+                await registerTokenWithRelay(
+                    deviceId: params.deviceId,
+                    openclawURL: params.openclawURL,
+                    openclawToken: params.openclawToken
+                )
+            }
+        }
     }
 
     func registrationFailed(_ error: Error) {
@@ -146,9 +161,11 @@ final class NotificationService {
     /// a persistent WebSocket connection to listen for agent messages.
     func registerTokenWithRelay(deviceId: String, openclawURL: String? = nil, openclawToken: String? = nil) async {
         guard let token = apnsToken, !token.isEmpty else {
-            log.info("No APNs token available, skipping relay registration")
+            log.info("No APNs token yet, deferring relay registration")
+            pendingRelayParams = (deviceId, openclawURL, openclawToken)
             return
         }
+        pendingRelayParams = nil
 
         let bundleId = Bundle.main.bundleIdentifier ?? "com.kochito.claudio"
         let url = URL(string: "\(Self.relayURL)/push/register")!
