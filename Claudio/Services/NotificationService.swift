@@ -32,12 +32,30 @@ final class NotificationService {
         didSet { UserDefaults.standard.set(notifyAllEvents, forKey: "notifyAllEvents") }
     }
 
+    /// Set by AppDelegate when a notification is tapped; observed by ClaudioApp to navigate.
+    var pendingAgentId: String?
+
+    /// Whether the user has already been prompted for notifications (post-first-message).
+    var hasPromptedForNotifications: Bool {
+        didSet { UserDefaults.standard.set(hasPromptedForNotifications, forKey: "hasPromptedForNotifications") }
+    }
+
     private init() {
         self.notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
         self.notifyAgentMessages = UserDefaults.standard.object(forKey: "notifyAgentMessages") as? Bool ?? true
         self.notifyMentions = UserDefaults.standard.object(forKey: "notifyMentions") as? Bool ?? false
         self.notifyAllEvents = UserDefaults.standard.bool(forKey: "notifyAllEvents")
+        self.hasPromptedForNotifications = UserDefaults.standard.bool(forKey: "hasPromptedForNotifications")
         Task { await refreshPermissionState() }
+    }
+
+    // Testable initializer — skips singleton and permission refresh
+    init(testDefaults: UserDefaults) {
+        self.notificationsEnabled = testDefaults.bool(forKey: "notificationsEnabled")
+        self.notifyAgentMessages = testDefaults.object(forKey: "notifyAgentMessages") as? Bool ?? true
+        self.notifyMentions = testDefaults.object(forKey: "notifyMentions") as? Bool ?? false
+        self.notifyAllEvents = testDefaults.bool(forKey: "notifyAllEvents")
+        self.hasPromptedForNotifications = testDefaults.bool(forKey: "hasPromptedForNotifications")
     }
 
     // MARK: - Permission
@@ -88,6 +106,23 @@ final class NotificationService {
         log.error("APNs registration failed: \(error)")
     }
 
+    // MARK: - Badge Management
+
+    func updateBadgeCount(_ count: Int) {
+        let center = UNUserNotificationCenter.current()
+        Task {
+            do {
+                try await center.setBadgeCount(count)
+            } catch {
+                log.error("setBadgeCount failed: \(error)")
+            }
+        }
+    }
+
+    func clearBadge() {
+        updateBadgeCount(0)
+    }
+
     // MARK: - Server Registration
 
     func registerTokenIfNeeded(via client: WebSocketClient) async {
@@ -98,6 +133,55 @@ final class NotificationService {
             log.info("APNs token registered with server")
         } catch {
             log.error("Failed to register APNs token: \(error)")
+        }
+    }
+
+    // MARK: - Push Relay Registration
+
+    private static let relayURL = "https://claudio-server-production.up.railway.app"
+
+    /// Registers the APNs token with the central push relay so it can send
+    /// notifications on behalf of any OpenClaw server.
+    /// When openclawURL and openclawToken are provided, the relay also starts
+    /// a persistent WebSocket connection to listen for agent messages.
+    func registerTokenWithRelay(deviceId: String, openclawURL: String? = nil, openclawToken: String? = nil) async {
+        guard let token = apnsToken, !token.isEmpty else {
+            log.info("No APNs token available, skipping relay registration")
+            return
+        }
+
+        let bundleId = Bundle.main.bundleIdentifier ?? "com.kochito.claudio"
+        let url = URL(string: "\(Self.relayURL)/push/register")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+
+        var body: [String: String] = [
+            "deviceId": deviceId,
+            "token": token,
+            "bundleId": bundleId
+        ]
+
+        if let openclawURL, !openclawURL.isEmpty {
+            body["openclawURL"] = openclawURL
+        }
+        if let openclawToken, !openclawToken.isEmpty {
+            body["openclawToken"] = openclawToken
+        }
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                log.info("APNs token registered with push relay (relay=\(openclawURL != nil))")
+            } else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                log.error("Push relay registration failed with status \(status)")
+            }
+        } catch {
+            log.error("Push relay registration failed: \(error)")
         }
     }
 }

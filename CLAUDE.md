@@ -58,6 +58,24 @@ Tests live in `ClaudioTests/`. Current test files:
 - Fresh init has no servers
 - ToolCall.isComplete
 
+## Two Modes of Chat — IMPORTANT
+
+Claudio has two completely separate chat paths. Understand the difference before touching anything.
+
+**1. Agent DMs (primary use case)**
+The user chats 1:1 with an AI agent. The app connects directly to the user's own OpenClaw server — a self-hosted backend that the user runs themselves. Claudio is purely a client here. We have ZERO backend involvement. We cannot modify OpenClaw and must never require OpenClaw changes. The chat flow is: app → user's OpenClaw server → agent response back to app.
+
+**2. Rooms (secondary use case)**
+Multi-user group conversations where people invite other people and agents. These go through our Go backend (`claudio-server/`, hosted on Railway at `claudio-server-production.up.railway.app`). The Go backend handles WebSocket connections, room membership, message persistence, and proxying agent calls to OpenClaw.
+
+**Our backend services:**
+- **Go backend** (`claudio-server/`, hosted on Railway at `claudio-server-production.up.railway.app`) — Primarily handles rooms, but also hosts shared infrastructure like the push notification relay. This is a full WebSocket server with SQLite, auth, and OpenClaw integration.
+- **claudio.la** (`web/`) — Static site serving the marketing page, privacy/terms, and the Chaos .json system. Hosted separately.
+
+Since we can't modify OpenClaw and don't control users' servers, these are the only server-side resources we own. Features that need a backend (like APNs push delivery) live on one of these.
+
+These are completely different chat systems. DMs don't touch our Go backend for chat. Rooms don't use the direct OpenClaw REST API. When implementing features, always ask: does this apply to DMs, rooms, or both? And if it needs to work for DMs, remember: we cannot change OpenClaw.
+
 ## Architecture
 
 Pure SwiftUI, no external dependencies. iOS 17+. No API keys, no credentials, no auth stored on device — ever.
@@ -89,7 +107,7 @@ POST {server}/api/tts          → audio/mpeg binary
 
 ## Not in v1
 
-No auth, no user accounts, no push notifications, no background modes, no streaming responses, no direct Hume integration.
+No auth, no user accounts, no background modes, no streaming responses, no direct Hume integration.
 
 ## File Structure
 

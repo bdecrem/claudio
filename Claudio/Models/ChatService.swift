@@ -13,7 +13,9 @@ final class ChatService {
     var agentFetchFailed = false
     var connectionError: String?
     var wsConnectionState: WebSocketClient.ConnectionState = .disconnected
-    var unreadAgentIds: Set<String> = []
+    var unreadAgentIds: Set<String> = [] {
+        didSet { NotificationService.shared.updateBadgeCount(unreadAgentIds.count) }
+    }
 
     // Per-agent chat history
     private var chatHistories: [String: [Message]] = [:]
@@ -288,6 +290,15 @@ final class ChatService {
 
         // Register APNs token if available
         await NotificationService.shared.registerTokenIfNeeded(via: webSocketClient)
+
+        // Register with central push relay (include OpenClaw info for DM push)
+        let deviceId = DeviceIdentity.shared.deviceId
+        let server = activeServer
+        await NotificationService.shared.registerTokenWithRelay(
+            deviceId: deviceId,
+            openclawURL: server?.url,
+            openclawToken: server?.token
+        )
     }
 
     @MainActor

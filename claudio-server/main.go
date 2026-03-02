@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/nicebartender/claudio-server/apns"
 	"github.com/nicebartender/claudio-server/db"
 	"github.com/nicebartender/claudio-server/joincode"
+	"github.com/nicebartender/claudio-server/relay"
 	"github.com/nicebartender/claudio-server/rpc"
 	"github.com/nicebartender/claudio-server/ws"
 )
@@ -35,6 +37,23 @@ func main() {
 	router.ExternalURL = cfg.ExternalURL
 
 	go hub.Run()
+
+	// Initialize APNs client (optional — server works without it)
+	var apnsClient *apns.Client
+	if cfg.APNS.KeyID != "" {
+		apnsClient, err = apns.NewClient(cfg.APNS)
+		if err != nil {
+			slog.Error("failed to init APNs client", "err", err)
+		} else {
+			slog.Info("APNs client initialized", "keyID", cfg.APNS.KeyID, "sandbox", cfg.APNS.Sandbox)
+		}
+	} else {
+		slog.Info("APNs not configured, push notifications disabled")
+	}
+
+	// Initialize relay manager for DM push notifications
+	relayMgr := relay.NewManager(database, apnsClient)
+	relayMgr.LoadAll()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -93,6 +112,165 @@ func main() {
 			"roomName":   room.Name,
 			"roomEmoji":  room.Emoji,
 		})
+	})
+
+	// Push: register device token (+ optional OpenClaw relay info)
+	http.HandleFunc("/push/register", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID     string `json:"deviceId"`
+			Token        string `json:"token"`
+			BundleID     string `json:"bundleId"`
+			OpenclawURL  string `json:"openclawURL"`
+			OpenclawToken string `json:"openclawToken"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+			return
+		}
+
+		if req.DeviceID == "" || req.Token == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "deviceId and token are required"})
+			return
+		}
+
+		bundleID := req.BundleID
+		if bundleID == "" {
+			bundleID = "com.kochito.claudio"
+		}
+
+		if err := database.UpsertPushToken(req.DeviceID, req.Token, bundleID, "ios"); err != nil {
+			slog.Error("failed to upsert push token", "err", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "internal error"})
+			return
+		}
+
+		// If OpenClaw info provided, start relay connection for DM push
+		if req.OpenclawURL != "" && req.OpenclawToken != "" {
+			if err := database.UpsertWatch(req.DeviceID, req.OpenclawURL, req.OpenclawToken); err != nil {
+				slog.Error("failed to upsert watch", "err", err)
+			} else {
+				relayMgr.Start(req.DeviceID, req.OpenclawURL, req.OpenclawToken)
+			}
+		}
+
+		slog.Info("push token registered", "deviceId", req.DeviceID[:min(8, len(req.DeviceID))]+"...", "bundleId", bundleID, "relay", req.OpenclawURL != "")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
+
+	// Push: unregister — stop relay and remove watch
+	http.HandleFunc("/push/unregister", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			DeviceID string `json:"deviceId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.DeviceID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "deviceId is required"})
+			return
+		}
+
+		relayMgr.Stop(req.DeviceID)
+		_ = database.DeleteWatch(req.DeviceID)
+
+		slog.Info("push unregistered", "deviceId", req.DeviceID[:min(8, len(req.DeviceID))]+"...")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
+
+	// Push: send notification (called by OpenClaw servers)
+	http.HandleFunc("/push/send", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Auth check
+		if cfg.PushSecret != "" {
+			auth := r.Header.Get("Authorization")
+			if !strings.HasPrefix(auth, "Bearer ") || strings.TrimPrefix(auth, "Bearer ") != cfg.PushSecret {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+				return
+			}
+		}
+
+		if apnsClient == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "APNs not configured"})
+			return
+		}
+
+		var req struct {
+			DeviceID string            `json:"deviceId"`
+			Alert    apns.Alert        `json:"alert"`
+			Data     map[string]string `json:"data"`
+			ThreadID string            `json:"threadId"`
+			BundleID string            `json:"bundleId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+			return
+		}
+
+		if req.DeviceID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "deviceId is required"})
+			return
+		}
+
+		bundleID := req.BundleID
+		if bundleID == "" {
+			bundleID = "com.kochito.claudio"
+		}
+
+		token, err := database.GetPushToken(req.DeviceID, bundleID)
+		if err != nil {
+			slog.Warn("push token not found", "deviceId", req.DeviceID[:min(8, len(req.DeviceID))]+"...", "err", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "device not registered"})
+			return
+		}
+
+		payload := apns.Payload{
+			Alert:    req.Alert,
+			Sound:    "default",
+			ThreadID: req.ThreadID,
+			Data:     req.Data,
+		}
+
+		if err := apnsClient.Send(token, payload, bundleID); err != nil {
+			slog.Error("failed to send push", "deviceId", req.DeviceID[:min(8, len(req.DeviceID))]+"...", "err", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(map[string]string{"error": "push delivery failed"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 	})
 
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)

@@ -33,6 +33,7 @@
 		N10000010000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000002 /* AppDelegate.swift */; };
 		T10000010000000000000001 /* RPCTypesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000001 /* RPCTypesTests.swift */; };
 		T10000010000000000000002 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000002 /* ChatServiceTests.swift */; };
+		T10000010000000000000003 /* NotificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T20000010000000000000003 /* NotificationServiceTests.swift */; };
 		G10000010000000000000001 /* Room.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000001 /* Room.swift */; };
 		G10000010000000000000002 /* RoomService.swift in Sources */ = {isa = PBXBuildFile; fileRef = G20000010000000000000002 /* RoomService.swift */; };
 		J10000010000000000000001 /* JoinCodeDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = J20000010000000000000001 /* JoinCodeDecoder.swift */; };
@@ -79,6 +80,7 @@
 		N20000010000000000000003 /* Claudio.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Claudio.entitlements; sourceTree = "<group>"; };
 		T20000010000000000000001 /* RPCTypesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypesTests.swift; sourceTree = "<group>"; };
 		T20000010000000000000002 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
+		T20000010000000000000003 /* NotificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		T30000010000000000000001 /* ClaudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClaudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		G20000010000000000000001 /* Room.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Room.swift; sourceTree = "<group>"; };
 		G20000010000000000000002 /* RoomService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomService.swift; sourceTree = "<group>"; };
@@ -226,6 +228,7 @@
 			children = (
 				T20000010000000000000001 /* RPCTypesTests.swift */,
 				T20000010000000000000002 /* ChatServiceTests.swift */,
+				T20000010000000000000003 /* NotificationServiceTests.swift */,
 			);
 			path = ClaudioTests;
 			sourceTree = "<group>";
@@ -379,6 +382,7 @@
 			files = (
 				T10000010000000000000001 /* RPCTypesTests.swift in Sources */,
 				T10000010000000000000002 /* ChatServiceTests.swift in Sources */,
+				T10000010000000000000003 /* NotificationServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

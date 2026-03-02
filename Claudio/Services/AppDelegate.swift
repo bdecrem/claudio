@@ -36,13 +36,29 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound, .badge]
+        let userInfo = notification.request.content.userInfo
+        if let agentId = userInfo["agentId"] as? String,
+           agentId == currentlySelectedAgentId {
+            // Don't show banner for the chat the user is already looking at
+            return []
+        }
+        return [.banner, .sound, .badge]
     }
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
+        let userInfo = response.notification.request.content.userInfo
         log.info("Notification tapped: \(response.notification.request.identifier)")
+        if let agentId = userInfo["agentId"] as? String {
+            log.info("Routing to agent: \(agentId)")
+            await MainActor.run {
+                NotificationService.shared.pendingAgentId = agentId
+            }
+        }
     }
+
+    /// The raw agentId of the currently selected agent (set by ChatService via ClaudioApp).
+    var currentlySelectedAgentId: String?
 }
