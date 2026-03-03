@@ -440,6 +440,28 @@ struct SettingsView: View {
                     .padding(.horizontal, 16)
                 }
                 .padding(.top, 8)
+
+                    // Device ID (for debugging push notifications)
+                    HStack {
+                        Text("Device ID")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Theme.textDim.opacity(0.4))
+                        Spacer()
+                        Text(DeviceIdentity.shared.deviceId.prefix(12) + "...")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Theme.textDim.opacity(0.4))
+                            .onTapGesture {
+                                UIPasteboard.general.string = DeviceIdentity.shared.deviceId
+                            }
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.textDim.opacity(0.3))
+                            .onTapGesture {
+                                UIPasteboard.general.string = DeviceIdentity.shared.deviceId
+                            }
+                    }
+                    .padding(.horizontal, 24)
+
                 .padding(.bottom, 40)
             }
             .background(Theme.background)

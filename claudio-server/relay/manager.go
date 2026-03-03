@@ -79,6 +79,18 @@ func (m *Manager) Stop(deviceID string) {
 	}
 }
 
+// Status returns the status of all active relay connections.
+func (m *Manager) Status() []ConnectionStatus {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	statuses := make([]ConnectionStatus, 0, len(m.conns))
+	for _, conn := range m.conns {
+		statuses = append(statuses, conn.Status())
+	}
+	return statuses
+}
+
 func (m *Manager) sendPush(deviceID, agentName string) {
 	if m.apnsClient == nil {
 		slog.Warn("relay: APNs not configured, skipping push")
@@ -92,12 +104,14 @@ func (m *Manager) sendPush(deviceID, agentName string) {
 		return
 	}
 
+	badge := 1
 	payload := apns.Payload{
 		Alert: apns.Alert{
 			Title: "New message",
 			Body:  agentName + " sent a message",
 		},
 		Sound: "default",
+		Badge: &badge,
 		Data: map[string]string{
 			"agentId": agentName,
 		},

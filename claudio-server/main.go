@@ -273,6 +273,72 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 	})
 
+	// Push: status — show active relay connections
+	http.HandleFunc("/push/status", func(w http.ResponseWriter, r *http.Request) {
+		statuses := relayMgr.Status()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"relays": statuses,
+			"count":  len(statuses),
+		})
+	})
+
+	// Push: test — send a test notification to a device
+	http.HandleFunc("/push/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		if apnsClient == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "APNs not configured"})
+			return
+		}
+
+		var req struct {
+			DeviceID string `json:"deviceId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.DeviceID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "deviceId is required"})
+			return
+		}
+
+		bundleID := "com.kochito.claudio"
+		token, err := database.GetPushToken(req.DeviceID, bundleID)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "device not registered"})
+			return
+		}
+
+		badge := 1
+		payload := apns.Payload{
+			Alert: apns.Alert{
+				Title: "Test Notification",
+				Body:  "Push notifications are working!",
+			},
+			Sound: "default",
+			Badge: &badge,
+			Data:  map[string]string{"test": "true"},
+		}
+
+		if err := apnsClient.Send(token, payload, bundleID); err != nil {
+			slog.Error("test push failed", "err", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
+
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)
 	if err := http.ListenAndServe(cfg.ListenAddr, nil); err != nil {
 		slog.Error("server failed", "err", err)

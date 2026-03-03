@@ -16,6 +16,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ConnectionStatus represents the current state of a relay connection.
+type ConnectionStatus struct {
+	DeviceID    string `json:"deviceId"`
+	OpenclawURL string `json:"openclawURL"`
+	Connected   bool   `json:"connected"`
+	LastEvent   string `json:"lastEvent,omitempty"` // RFC3339
+	LastError   string `json:"lastError,omitempty"`
+}
+
 // Connection manages a persistent WebSocket connection to a user's OpenClaw server.
 // It listens for chat events and triggers push notifications.
 type Connection struct {
@@ -41,6 +50,11 @@ type Connection struct {
 
 	// Callback to send APNs push
 	onAgentMessage func(deviceID, agentName string)
+
+	// Status tracking
+	connected  atomic.Bool
+	lastEvent  atomic.Value // time.Time
+	lastError  atomic.Value // string
 }
 
 type wireMessage struct {
@@ -93,6 +107,7 @@ func (c *Connection) run() {
 
 		err := c.connectAndListen()
 		if err != nil {
+			c.lastError.Store(err.Error())
 			slog.Warn("relay connection failed", "deviceId", c.deviceID[:min(8, len(c.deviceID))], "err", err)
 		}
 
@@ -150,10 +165,13 @@ func (c *Connection) connectAndListen() error {
 		return fmt.Errorf("auth: %w", err)
 	}
 
+	c.connected.Store(true)
 	slog.Info("relay: connected to OpenClaw", "deviceId", c.deviceID[:min(8, len(c.deviceID))], "url", wsURL)
 
 	// Listen for events until disconnect or stop
-	return c.eventLoop()
+	err = c.eventLoop()
+	c.connected.Store(false)
+	return err
 }
 
 func (c *Connection) readLoop() {
@@ -266,6 +284,7 @@ func (c *Connection) handleChatEvent(evt wireMessage) {
 		}
 	}
 
+	c.lastEvent.Store(time.Now())
 	slog.Info("relay: chat final event", "deviceId", c.deviceID[:min(8, len(c.deviceID))], "agent", agentName)
 
 	if c.onAgentMessage != nil {
@@ -388,6 +407,22 @@ func (c *Connection) authenticate() error {
 	}
 
 	return nil
+}
+
+// Status returns the current status of this connection.
+func (c *Connection) Status() ConnectionStatus {
+	s := ConnectionStatus{
+		DeviceID:    c.deviceID[:min(8, len(c.deviceID))] + "...",
+		OpenclawURL: c.openclawURL,
+		Connected:   c.connected.Load(),
+	}
+	if t, ok := c.lastEvent.Load().(time.Time); ok && !t.IsZero() {
+		s.LastEvent = t.Format(time.RFC3339)
+	}
+	if e, ok := c.lastError.Load().(string); ok && e != "" {
+		s.LastError = e
+	}
+	return s
 }
 
 func base64URLEncode(data []byte) string {
