@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -271,6 +272,35 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
+
+	// Push: debug — show stored token info for a device
+	http.HandleFunc("/push/debug", func(w http.ResponseWriter, r *http.Request) {
+		deviceID := r.URL.Query().Get("deviceId")
+		if deviceID == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "deviceId query param required"})
+			return
+		}
+
+		token, bundleID, platform, updatedAt, err := database.GetPushTokenDebug(deviceID)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"tokenPrefix": token[:min(16, len(token))] + "...",
+			"tokenLength": fmt.Sprintf("%d", len(token)),
+			"bundleId":    bundleID,
+			"platform":    platform,
+			"updatedAt":   updatedAt,
+			"sandbox":     fmt.Sprintf("%v", cfg.APNS.Sandbox),
+		})
 	})
 
 	// Push: status — show active relay connections

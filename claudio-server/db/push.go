@@ -26,6 +26,15 @@ func (d *DB) GetPushToken(deviceID, bundleID string) (string, error) {
 	return token, nil
 }
 
+// GetPushTokenDebug returns token info with metadata for debugging.
+func (d *DB) GetPushTokenDebug(deviceID string) (token, bundleID, platform, updatedAt string, err error) {
+	err = d.QueryRow(`SELECT token, bundle_id, platform, updated_at FROM push_tokens WHERE device_id = ?`, deviceID).Scan(&token, &bundleID, &platform, &updatedAt)
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("get push token debug: %w", err)
+	}
+	return
+}
+
 // GetPushTokensForDevice returns all APNs tokens for a device (across bundle IDs).
 func (d *DB) GetPushTokensForDevice(deviceID string) ([]string, error) {
 	rows, err := d.Query(`SELECT token FROM push_tokens WHERE device_id = ?`, deviceID)
