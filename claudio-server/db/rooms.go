@@ -11,6 +11,7 @@ type Room struct {
 	Name             string         `json:"name"`
 	Emoji            string         `json:"emoji"`
 	CreatedBy        string         `json:"createdBy"`
+	Public           bool           `json:"public"`
 	CreatedAt        time.Time      `json:"createdAt"`
 	UpdatedAt        time.Time      `json:"updatedAt"`
 	ParticipantCount int            `json:"participantCount,omitempty"`
@@ -45,13 +46,13 @@ func nanoid() string {
 	return hex.EncodeToString(b)[:12]
 }
 
-func (db *DB) CreateRoom(name, emoji, createdBy string) (*Room, error) {
+func (db *DB) CreateRoom(name, emoji, createdBy string, public bool) (*Room, error) {
 	id := nanoid()
 	now := time.Now().UTC()
 	_, err := db.Exec(`
-		INSERT INTO rooms (id, name, emoji, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, id, name, emoji, createdBy, now, now)
+		INSERT INTO rooms (id, name, emoji, created_by, public, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, id, name, emoji, createdBy, public, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +70,7 @@ func (db *DB) CreateRoom(name, emoji, createdBy string) (*Room, error) {
 		Name:      name,
 		Emoji:     emoji,
 		CreatedBy: createdBy,
+		Public:    public,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -77,9 +79,9 @@ func (db *DB) CreateRoom(name, emoji, createdBy string) (*Room, error) {
 func (db *DB) GetRoom(id string) (*Room, error) {
 	r := &Room{}
 	err := db.QueryRow(`
-		SELECT id, name, emoji, created_by, created_at, updated_at
+		SELECT id, name, emoji, created_by, public, created_at, updated_at
 		FROM rooms WHERE id = ?
-	`, id).Scan(&r.ID, &r.Name, &r.Emoji, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt)
+	`, id).Scan(&r.ID, &r.Name, &r.Emoji, &r.CreatedBy, &r.Public, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +102,7 @@ func (db *DB) GetRoom(id string) (*Room, error) {
 
 func (db *DB) ListRoomsForUser(userID string) ([]Room, error) {
 	rows, err := db.Query(`
-		SELECT r.id, r.name, r.emoji, r.created_by, r.created_at, r.updated_at,
+		SELECT r.id, r.name, r.emoji, r.created_by, r.public, r.created_at, r.updated_at,
 		       (SELECT COUNT(*) FROM participants WHERE room_id = r.id) as participant_count
 		FROM rooms r
 		JOIN participants p ON p.room_id = r.id AND p.user_id = ?
@@ -114,13 +116,44 @@ func (db *DB) ListRoomsForUser(userID string) ([]Room, error) {
 	var rooms []Room
 	for rows.Next() {
 		var r Room
-		if err := rows.Scan(&r.ID, &r.Name, &r.Emoji, &r.CreatedBy, &r.CreatedAt, &r.UpdatedAt, &r.ParticipantCount); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Emoji, &r.CreatedBy, &r.Public, &r.CreatedAt, &r.UpdatedAt, &r.ParticipantCount); err != nil {
 			continue
 		}
 		r.LastMessage, _ = db.getLastMessage(r.ID)
 		rooms = append(rooms, r)
 	}
 	return rooms, nil
+}
+
+func (db *DB) ListPublicRooms() ([]Room, error) {
+	rows, err := db.Query(`
+		SELECT r.id, r.name, r.emoji, r.created_by, r.public, r.created_at, r.updated_at,
+		       (SELECT COUNT(*) FROM participants WHERE room_id = r.id) as participant_count
+		FROM rooms r
+		WHERE r.public = 1
+		ORDER BY r.updated_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rooms []Room
+	for rows.Next() {
+		var r Room
+		if err := rows.Scan(&r.ID, &r.Name, &r.Emoji, &r.CreatedBy, &r.Public, &r.CreatedAt, &r.UpdatedAt, &r.ParticipantCount); err != nil {
+			continue
+		}
+		r.LastMessage, _ = db.getLastMessage(r.ID)
+		rooms = append(rooms, r)
+	}
+	return rooms, nil
+}
+
+func (db *DB) IsRoomPublic(roomID string) (bool, error) {
+	var public bool
+	err := db.QueryRow(`SELECT public FROM rooms WHERE id = ?`, roomID).Scan(&public)
+	return public, err
 }
 
 func (db *DB) getLastMessage(roomID string) (*LastMessage, error) {

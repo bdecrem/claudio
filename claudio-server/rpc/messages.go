@@ -18,22 +18,29 @@ func (r *Router) handleRoomsSend(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Verify participant
-	ok, _ := r.DB.IsParticipant(roomID, client.UserID())
-	if !ok {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
-		return
-	}
-
-	// Get sender info
-	user, _ := r.DB.GetUser(client.UserID())
+	// Verify access
 	senderName := client.DisplayName()
 	senderEmoji := ""
-	if user != nil {
-		if user.DisplayName != "" {
-			senderName = user.DisplayName
+
+	if client.IsGuest() {
+		isPublic, _ := r.DB.IsRoomPublic(roomID)
+		if !isPublic {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only send in public rooms"))
+			return
 		}
-		senderEmoji = user.AvatarEmoji
+	} else {
+		ok, _ := r.DB.IsParticipant(roomID, client.UserID())
+		if !ok {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
+			return
+		}
+		user, _ := r.DB.GetUser(client.UserID())
+		if user != nil {
+			if user.DisplayName != "" {
+				senderName = user.DisplayName
+			}
+			senderEmoji = user.AvatarEmoji
+		}
 	}
 
 	// Parse mentions
@@ -77,11 +84,19 @@ func (r *Router) handleRoomsHistory(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Verify participant
-	ok, _ := r.DB.IsParticipant(roomID, client.UserID())
-	if !ok {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
-		return
+	// Verify access
+	if client.IsGuest() {
+		isPublic, _ := r.DB.IsRoomPublic(roomID)
+		if !isPublic {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access public rooms"))
+			return
+		}
+	} else {
+		ok, _ := r.DB.IsParticipant(roomID, client.UserID())
+		if !ok {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
+			return
+		}
 	}
 
 	limit := jsonInt(req.Params["limit"])

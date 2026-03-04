@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     name TEXT NOT NULL,
     emoji TEXT NOT NULL DEFAULT '',
     created_by TEXT NOT NULL REFERENCES users(id),
+    public BOOLEAN NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT (datetime('now')),
     updated_at DATETIME NOT NULL DEFAULT (datetime('now'))
 );

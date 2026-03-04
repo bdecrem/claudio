@@ -131,6 +131,22 @@ func (h *Hub) handleMessage(client *Client, data []byte) {
 			return
 		}
 
+		// Allow rooms.listPublic without auth
+		if msg.Method == "rooms.listPublic" {
+			var params map[string]json.RawMessage
+			if msg.Params != nil {
+				json.Unmarshal(msg.Params, &params)
+			}
+			if params == nil {
+				params = make(map[string]json.RawMessage)
+			}
+			req := RPCRequest{ID: msg.ID, Method: msg.Method, Params: params}
+			if h.RPCRouter != nil {
+				h.RPCRouter(client, req)
+			}
+			return
+		}
+
 		// All other methods require auth
 		if !client.IsAuthenticated() {
 			client.SendJSON(NewErrorResponse(msg.ID, "AUTH_REQUIRED", "Not authenticated"))
@@ -157,6 +173,41 @@ func (h *Hub) handleMessage(client *Client, data []byte) {
 }
 
 func (h *Hub) handleConnect(client *Client, msg RPCMessage) {
+	// Check for guest connect
+	var peek struct {
+		Guest       bool   `json:"guest"`
+		DisplayName string `json:"displayName"`
+	}
+	if msg.Params != nil {
+		json.Unmarshal(msg.Params, &peek)
+	}
+
+	if peek.Guest {
+		// Guest connect: no Ed25519 auth, no DB user
+		guestID := "guest-" + generateNonce()[:12]
+		displayName := peek.DisplayName
+		if displayName == "" {
+			displayName = "Guest"
+		}
+		client.SetGuestAuth(guestID, displayName)
+
+		client.SendJSON(RPCResponse{
+			Type: "res",
+			ID:   msg.ID,
+			OK:   true,
+			Payload: map[string]interface{}{
+				"protocol": 3,
+				"policy": map[string]interface{}{
+					"tickIntervalMs": 15000,
+				},
+			},
+		})
+
+		slog.Info("guest connected", "guestID", guestID, "displayName", displayName)
+		go h.tickLoop(client)
+		return
+	}
+
 	userID, displayName, err := VerifyConnect(msg.Params, client.challengeNonce)
 	if err != nil {
 		slog.Warn("auth failed", "err", err)
