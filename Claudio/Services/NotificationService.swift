@@ -87,6 +87,8 @@ final class NotificationService {
             switch settings.authorizationStatus {
             case .authorized, .provisional, .ephemeral:
                 permissionState = .authorized
+                // Always re-register on launch — APNs tokens can change between builds
+                UIApplication.shared.registerForRemoteNotifications()
             case .denied:
                 permissionState = .denied
             case .notDetermined:
