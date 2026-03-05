@@ -257,6 +257,26 @@ final class RoomService {
     func enterRoom(_ room: Room) async {
         activeRoom = room
         activeRoomMessages = roomMessageHistories[room.id] ?? []
+
+        // Wait for WebSocket connection if not yet ready
+        if !isConnected {
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .milliseconds(200))
+                if isConnected { break }
+            }
+        }
+
+        // Auto-join public rooms (e.g. lobby) so we receive broadcasts
+        if room.isPublic {
+            do {
+                _ = try await webSocketClient.send(method: "rooms.join", params: [
+                    "roomId": .string(room.id)
+                ])
+            } catch {
+                log.error("enterRoom join: \(error)")
+            }
+        }
+
         await loadHistory(room.id)
     }
 
