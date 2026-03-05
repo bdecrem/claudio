@@ -277,6 +277,11 @@ final class RoomService {
             }
         }
 
+        // Fetch full room info (participants, etc.) to update the view
+        if let updated = await fetchRoomInfo(room.id) {
+            activeRoom = updated
+        }
+
         await loadHistory(room.id)
     }
 

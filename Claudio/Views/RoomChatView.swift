@@ -9,7 +9,12 @@ struct RoomChatView: View {
     @State private var showSettings = false
     @State private var showMentions = false
     @State private var mentionFilter = ""
+    @State private var showHandlePrompt = false
+    @State private var handleInput = ""
     @FocusState private var inputFocused: Bool
+
+    /// Live room data from server (has participants), falling back to the static room passed in
+    private var displayRoom: Room { roomService.activeRoom ?? room }
 
     var body: some View {
         ZStack {
@@ -60,7 +65,7 @@ struct RoomChatView: View {
             // Mention overlay
             if showMentions {
                 MentionOverlay(
-                    participants: room.participants,
+                    participants: displayRoom.participants,
                     filter: mentionFilter,
                     onSelect: { participant in
                         insertMention(participant)
@@ -76,6 +81,21 @@ struct RoomChatView: View {
         }
         .task {
             await roomService.enterRoom(room)
+            if roomService.displayName.isEmpty && room.isPublic {
+                showHandlePrompt = true
+            }
+        }
+        .alert("Set your display name", isPresented: $showHandlePrompt) {
+            TextField("Name", text: $handleInput)
+            Button("Save") {
+                let name = handleInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty else { return }
+                roomService.displayName = name
+                Task { await roomService.updateProfile() }
+            }
+            Button("Skip", role: .cancel) {}
+        } message: {
+            Text("Choose a name others will see in the lobby.")
         }
         .onDisappear {
             roomService.exitRoom()
@@ -102,7 +122,7 @@ struct RoomChatView: View {
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .foregroundStyle(Theme.textPrimary)
                     }
-                    Text("\(room.participants.count) participants")
+                    Text("\(displayRoom.participants.count) participants")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -254,7 +274,7 @@ struct RoomChatView: View {
     private func extractMentionIds(from text: String) -> [String] {
         var ids: [String] = []
         let lower = text.lowercased()
-        for participant in room.participants {
+        for participant in displayRoom.participants {
             if lower.contains("@\(participant.displayName.lowercased())") {
                 ids.append(participant.id)
             }

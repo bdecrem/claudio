@@ -3,6 +3,10 @@
     "apple-docs": {
       "command": "npx",
       "args": ["-y", "@kimsungwhee/apple-docs-mcp"]
+    },
+    "railway": {
+      "command": "npx",
+      "args": ["-y", "@railway/mcp-server"]
     }
   }
 }
