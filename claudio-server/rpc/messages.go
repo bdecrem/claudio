@@ -55,9 +55,13 @@ func (r *Router) handleRoomsSend(client *ws.Client, req ws.RPCRequest) {
 		replyTo = &rt
 	}
 
-	userID := client.UserID()
 	msgID := generateMsgID()
-	msg, err := r.DB.InsertMessage(msgID, roomID, &userID, nil, senderName, senderEmoji, content, mentions, replyTo)
+	var senderUserID *string
+	if !client.IsGuest() {
+		uid := client.UserID()
+		senderUserID = &uid
+	}
+	msg, err := r.DB.InsertMessage(msgID, roomID, senderUserID, nil, senderName, senderEmoji, content, mentions, replyTo)
 	if err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return

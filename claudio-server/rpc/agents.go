@@ -12,7 +12,8 @@ import (
 
 // dispatchAgentMentions checks for @mentions of agents in a message and dispatches to OpenClaw
 func (r *Router) dispatchAgentMentions(roomID string, msg *db.Message) {
-	if msg.SenderUserID == nil {
+	// Skip messages from agents (prevent loops)
+	if msg.SenderAgentID != nil {
 		return
 	}
 
