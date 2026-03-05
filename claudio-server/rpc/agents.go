@@ -51,7 +51,14 @@ func (r *Router) callAgent(roomID string, agent db.Participant) {
 		return
 	}
 
-	sessionKey := "agent:" + agent.AgentID + ":main"
+	// Use the OpenClaw agent ID if set, otherwise fall back to our agent ID
+	ocAgentID := agent.OpenclawAgentID
+	if ocAgentID == "" {
+		ocAgentID = agent.AgentID
+	}
+	// Session key format: agent:{openclawAgentId}:lobby:{roomId}
+	// This gives each room its own conversation thread on the OpenClaw side
+	sessionKey := "agent:" + ocAgentID + ":lobby:" + roomID
 
 	// Get recent history to include as context in the message
 	messages, _ := r.DB.GetMessages(roomID, nil, 10)

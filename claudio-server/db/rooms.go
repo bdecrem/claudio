@@ -35,9 +35,10 @@ type Participant struct {
 	IsOnline    bool   `json:"isOnline"`
 	Role        string `json:"role"`
 	// Agent-specific fields
-	AgentID      string `json:"agentId,omitempty"`
-	OpenclawURL  string `json:"openclawUrl,omitempty"`
-	OpenclawToken string `json:"-"` // never sent to clients
+	AgentID        string `json:"agentId,omitempty"`
+	OpenclawURL    string `json:"openclawUrl,omitempty"`
+	OpenclawToken  string `json:"-"` // never sent to clients
+	OpenclawAgentID string `json:"-"` // agent ID on the OpenClaw server
 }
 
 func nanoid() string {
@@ -74,8 +75,17 @@ func (db *DB) EnsureLobby() error {
 }
 
 // EnsureLobbyAgent adds a default agent to the lobby if not already present.
-func (db *DB) EnsureLobbyAgent(agentID, openclawURL, openclawToken, agentName, agentEmoji string) error {
-	return db.AddAgentParticipant(LobbyRoomID, agentID, openclawURL, openclawToken, agentName, agentEmoji)
+// Also backfills openclaw_agent_id on existing rows.
+func (db *DB) EnsureLobbyAgent(agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji string) error {
+	if err := db.AddAgentParticipant(LobbyRoomID, agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji); err != nil {
+		return err
+	}
+	// Backfill openclaw_agent_id on existing rows that predate the column
+	if openclawAgentID != "" {
+		db.Exec(`UPDATE participants SET openclaw_agent_id = ? WHERE room_id = ? AND agent_id = ? AND openclaw_url = ? AND (openclaw_agent_id IS NULL OR openclaw_agent_id = '')`,
+			openclawAgentID, LobbyRoomID, agentID, openclawURL)
+	}
+	return nil
 }
 
 func (db *DB) CreateRoom(name, emoji, createdBy string, public bool) (*Room, error) {
@@ -218,11 +228,11 @@ func (db *DB) RemoveParticipant(roomID, userID string) error {
 	return err
 }
 
-func (db *DB) AddAgentParticipant(roomID, agentID, openclawURL, openclawToken, agentName, agentEmoji string) error {
+func (db *DB) AddAgentParticipant(roomID, agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji string) error {
 	_, err := db.Exec(`
-		INSERT OR IGNORE INTO participants (room_id, agent_id, openclaw_url, openclaw_token, agent_name, agent_emoji, role)
-		VALUES (?, ?, ?, ?, ?, ?, 'member')
-	`, roomID, agentID, openclawURL, openclawToken, agentName, agentEmoji)
+		INSERT OR IGNORE INTO participants (room_id, agent_id, openclaw_url, openclaw_token, openclaw_agent_id, agent_name, agent_emoji, role)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 'member')
+	`, roomID, agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji)
 	return err
 }
 
@@ -251,7 +261,7 @@ func (db *DB) GetAgentParticipant(roomID, agentID, openclawURL string) (*Partici
 
 func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 	rows, err := db.Query(`
-		SELECT p.user_id, p.agent_id, p.openclaw_url, p.openclaw_token, p.agent_name, p.agent_emoji, p.role,
+		SELECT p.user_id, p.agent_id, p.openclaw_url, p.openclaw_token, p.openclaw_agent_id, p.agent_name, p.agent_emoji, p.role,
 		       COALESCE(u.display_name, ''), COALESCE(u.avatar_emoji, '')
 		FROM participants p
 		LEFT JOIN users u ON u.id = p.user_id
@@ -264,8 +274,8 @@ func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 
 	var participants []Participant
 	for rows.Next() {
-		var userID, agentID, openclawURL, openclawToken, agentName, agentEmoji, role, userName, userEmoji *string
-		if err := rows.Scan(&userID, &agentID, &openclawURL, &openclawToken, &agentName, &agentEmoji, &role, &userName, &userEmoji); err != nil {
+		var userID, agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji, role, userName, userEmoji *string
+		if err := rows.Scan(&userID, &agentID, &openclawURL, &openclawToken, &openclawAgentID, &agentName, &agentEmoji, &role, &userName, &userEmoji); err != nil {
 			continue
 		}
 
@@ -278,6 +288,7 @@ func (db *DB) GetParticipants(roomID string) ([]Participant, error) {
 			p.AgentID = *agentID
 			p.OpenclawURL = deref(openclawURL)
 			p.OpenclawToken = deref(openclawToken)
+			p.OpenclawAgentID = deref(openclawAgentID)
 		} else if userID != nil {
 			p.ID = *userID
 			p.DisplayName = deref(userName)

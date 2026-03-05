@@ -29,6 +29,7 @@ func Open(path string) (*DB, error) {
 
 	// Migrations: add columns that may not exist on older DBs
 	sqlDB.Exec("ALTER TABLE rooms ADD COLUMN public BOOLEAN NOT NULL DEFAULT 0")
+	sqlDB.Exec("ALTER TABLE participants ADD COLUMN openclaw_agent_id TEXT")
 
 	slog.Info("database opened", "path", path)
 	return &DB{sqlDB}, nil

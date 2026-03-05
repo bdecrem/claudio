@@ -273,7 +273,7 @@ func (r *Router) handleRoomsAddAgent(client *ws.Client, req ws.RPCRequest) {
 		agentName = agentID
 	}
 
-	if err := r.DB.AddAgentParticipant(roomID, agentID, openclawURL, openclawToken, agentName, agentEmoji); err != nil {
+	if err := r.DB.AddAgentParticipant(roomID, agentID, openclawURL, openclawToken, "", agentName, agentEmoji); err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return
 	}

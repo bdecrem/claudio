@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS participants (
     agent_id TEXT,
     openclaw_url TEXT,
     openclaw_token TEXT,
+    openclaw_agent_id TEXT,    -- agent ID on the OpenClaw server (may differ from agent_id)
     agent_name TEXT,
     agent_emoji TEXT,
     role TEXT NOT NULL DEFAULT 'member',  -- owner, admin, member

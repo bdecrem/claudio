@@ -43,6 +43,7 @@ func main() {
 			cfg.LobbyAgent.AgentID,
 			cfg.LobbyAgent.OpenclawURL,
 			cfg.LobbyAgent.OpenclawToken,
+			cfg.LobbyAgent.OpenclawAgentID,
 			cfg.LobbyAgent.AgentName,
 			cfg.LobbyAgent.AgentEmoji,
 		); err != nil {

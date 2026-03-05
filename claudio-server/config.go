@@ -17,11 +17,12 @@ type Config struct {
 }
 
 type LobbyAgentConfig struct {
-	OpenclawURL   string
-	OpenclawToken string
-	AgentID       string
-	AgentName     string
-	AgentEmoji    string
+	OpenclawURL     string
+	OpenclawToken   string
+	AgentID         string // our participant ID in the room (e.g. "mave")
+	OpenclawAgentID string // agent ID on the OpenClaw server (e.g. "main")
+	AgentName       string
+	AgentEmoji      string
 }
 
 func LoadConfig() Config {
@@ -42,11 +43,12 @@ func LoadConfig() Config {
 	cfg.PushSecret = os.Getenv("CLAUDIO_PUSH_SECRET")
 
 	cfg.LobbyAgent = LobbyAgentConfig{
-		OpenclawURL:   os.Getenv("LOBBY_AGENT_OPENCLAW_URL"),
-		OpenclawToken: os.Getenv("LOBBY_AGENT_OPENCLAW_TOKEN"),
-		AgentID:       envOrDefault("LOBBY_AGENT_ID", "mave"),
-		AgentName:     envOrDefault("LOBBY_AGENT_NAME", "Mave"),
-		AgentEmoji:    envOrDefault("LOBBY_AGENT_EMOJI", "🌊"),
+		OpenclawURL:     os.Getenv("LOBBY_AGENT_OPENCLAW_URL"),
+		OpenclawToken:   os.Getenv("LOBBY_AGENT_OPENCLAW_TOKEN"),
+		AgentID:         envOrDefault("LOBBY_AGENT_ID", "mave"),
+		OpenclawAgentID: envOrDefault("LOBBY_AGENT_OPENCLAW_AGENT_ID", "main"),
+		AgentName:       envOrDefault("LOBBY_AGENT_NAME", "Mave"),
+		AgentEmoji:      envOrDefault("LOBBY_AGENT_EMOJI", "🌊"),
 	}
 
 	return cfg
