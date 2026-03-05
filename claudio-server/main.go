@@ -33,6 +33,24 @@ func main() {
 	}
 	defer database.Close()
 
+	if err := database.EnsureLobby(); err != nil {
+		slog.Error("failed to create lobby room", "err", err)
+	}
+
+	if cfg.LobbyAgent.OpenclawURL != "" {
+		if err := database.EnsureLobbyAgent(
+			cfg.LobbyAgent.AgentID,
+			cfg.LobbyAgent.OpenclawURL,
+			cfg.LobbyAgent.OpenclawToken,
+			cfg.LobbyAgent.AgentName,
+			cfg.LobbyAgent.AgentEmoji,
+		); err != nil {
+			slog.Error("failed to add lobby agent", "err", err)
+		} else {
+			slog.Info("lobby agent ensured", "agent", cfg.LobbyAgent.AgentID)
+		}
+	}
+
 	hub := ws.NewHub(database)
 	router := rpc.NewRouter(hub, database)
 	router.ExternalURL = cfg.ExternalURL

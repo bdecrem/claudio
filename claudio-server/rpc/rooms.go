@@ -41,13 +41,14 @@ func (r *Router) handleRoomsListPublic(client *ws.Client, req ws.RPCRequest) {
 func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 	name := jsonString(req.Params["name"])
 	emoji := jsonString(req.Params["emoji"])
+	isPublic := jsonBool(req.Params["public"])
 
 	if name == "" {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "INVALID_PARAMS", "name is required"))
 		return
 	}
 
-	room, err := r.DB.CreateRoom(name, emoji, client.UserID(), false)
+	room, err := r.DB.CreateRoom(name, emoji, client.UserID(), isPublic)
 	if err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return
@@ -368,4 +369,12 @@ func jsonInt(raw json.RawMessage) int {
 		json.Unmarshal(raw, &i)
 	}
 	return i
+}
+
+func jsonBool(raw json.RawMessage) bool {
+	var b bool
+	if raw != nil {
+		json.Unmarshal(raw, &b)
+	}
+	return b
 }

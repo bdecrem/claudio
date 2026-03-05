@@ -8,8 +8,9 @@ struct Room: Identifiable, Equatable, Codable {
     var lastMessage: RoomLastMessage?
     var unreadCount: Int
     var participantCount: Int
+    var isPublic: Bool
 
-    init(id: String, name: String, emoji: String? = nil, participants: [RoomParticipant] = [], lastMessage: RoomLastMessage? = nil, unreadCount: Int = 0, participantCount: Int = 0) {
+    init(id: String, name: String, emoji: String? = nil, participants: [RoomParticipant] = [], lastMessage: RoomLastMessage? = nil, unreadCount: Int = 0, participantCount: Int = 0, isPublic: Bool = false) {
         self.id = id
         self.name = name
         self.emoji = emoji
@@ -17,6 +18,7 @@ struct Room: Identifiable, Equatable, Codable {
         self.lastMessage = lastMessage
         self.unreadCount = unreadCount
         self.participantCount = participantCount
+        self.isPublic = isPublic
     }
 
     /// Parse from AnyCodableValue (WebSocket RPC payload)
@@ -30,6 +32,7 @@ struct Room: Identifiable, Equatable, Codable {
         self.emoji = obj["emoji"]?.stringValue
         self.participantCount = obj["participantCount"]?.intValue ?? 0
         self.unreadCount = obj["unreadCount"]?.intValue ?? 0
+        self.isPublic = obj["public"]?.boolValue ?? false
 
         if let participantsArr = obj["participants"]?.arrayValue {
             self.participants = participantsArr.compactMap { RoomParticipant(from: $0) }

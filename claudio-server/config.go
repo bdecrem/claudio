@@ -13,6 +13,15 @@ type Config struct {
 	ExternalURL string
 	APNS        apns.Config
 	PushSecret  string
+	LobbyAgent  LobbyAgentConfig
+}
+
+type LobbyAgentConfig struct {
+	OpenclawURL   string
+	OpenclawToken string
+	AgentID       string
+	AgentName     string
+	AgentEmoji    string
 }
 
 func LoadConfig() Config {
@@ -31,6 +40,14 @@ func LoadConfig() Config {
 		Sandbox:   os.Getenv("CLAUDIO_APNS_SANDBOX") == "true",
 	}
 	cfg.PushSecret = os.Getenv("CLAUDIO_PUSH_SECRET")
+
+	cfg.LobbyAgent = LobbyAgentConfig{
+		OpenclawURL:   os.Getenv("LOBBY_AGENT_OPENCLAW_URL"),
+		OpenclawToken: os.Getenv("LOBBY_AGENT_OPENCLAW_TOKEN"),
+		AgentID:       envOrDefault("LOBBY_AGENT_ID", "mave"),
+		AgentName:     envOrDefault("LOBBY_AGENT_NAME", "Mave"),
+		AgentEmoji:    envOrDefault("LOBBY_AGENT_EMOJI", "🌊"),
+	}
 
 	return cfg
 }

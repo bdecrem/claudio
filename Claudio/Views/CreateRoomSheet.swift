@@ -6,6 +6,7 @@ struct CreateRoomSheet: View {
 
     @State private var name = ""
     @State private var emoji = "💬"
+    @State private var isPublic = false
     @State private var isCreating = false
 
     private let emojiOptions = ["💬", "🚀", "🎯", "🧠", "⚡", "🌊", "🔥", "🎨", "🛠", "🎵"]
@@ -57,6 +58,20 @@ struct CreateRoomSheet: View {
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .padding(.horizontal, 16)
+
+                    // Public toggle
+                    Toggle(isOn: $isPublic) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Public Room")
+                                .font(.system(size: 15))
+                                .foregroundStyle(Theme.textPrimary)
+                            Text("Anyone can discover and join")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                    .tint(Theme.accent)
+                    .padding(.horizontal, 16)
                 }
             }
             .background(Theme.background)
@@ -71,7 +86,7 @@ struct CreateRoomSheet: View {
                     Button("Create") {
                         isCreating = true
                         Task {
-                            if let _ = await roomService.createRoom(name: name, emoji: emoji) {
+                            if let _ = await roomService.createRoom(name: name, emoji: emoji, isPublic: isPublic) {
                                 dismiss()
                             }
                             isCreating = false

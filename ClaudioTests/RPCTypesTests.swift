@@ -299,6 +299,30 @@ final class RPCTypesTests: XCTestCase {
         XCTAssertEqual(msg?.imageURLs, ["/media/gen/img001.png"])
     }
 
+    // MARK: - Room isPublic parsing
+
+    func testRoomWithPublicTrue() {
+        let value = AnyCodableValue.object([
+            "id": .string("room-1"),
+            "name": .string("General"),
+            "public": .bool(true),
+            "participantCount": .int(5)
+        ])
+        let room = Room(from: value)
+        XCTAssertNotNil(room)
+        XCTAssertTrue(room!.isPublic)
+    }
+
+    func testRoomWithoutPublicField() {
+        let value = AnyCodableValue.object([
+            "id": .string("room-2"),
+            "name": .string("Private Room")
+        ])
+        let room = Room(from: value)
+        XCTAssertNotNil(room)
+        XCTAssertFalse(room!.isPublic)
+    }
+
     func testHistoryMessageImageOnlyNotSkipped() {
         let value = AnyCodableValue.object([
             "role": .string("assistant"),

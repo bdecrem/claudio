@@ -22,32 +22,40 @@ struct ChatView: View {
                 .ignoresSafeArea()
 
             if !chatService.hasServer {
-                VStack(spacing: Theme.spacing * 3) {
-                    Spacer()
+                VStack(spacing: 0) {
+                    pickerSection
 
-                    Text("claudio")
-                        .font(.system(.largeTitle, design: .rounded, weight: .light))
-                        .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                    if let room = selectedRoom {
+                        RoomChatView(roomService: roomService, chatService: chatService, room: room)
+                    } else {
+                        VStack(spacing: Theme.spacing * 3) {
+                            Spacer()
 
-                    Text("Connect to your server to get started.")
-                        .font(Theme.body)
-                        .foregroundStyle(Theme.textSecondary.opacity(0.6))
-                        .multilineTextAlignment(.center)
+                            Text("claudio")
+                                .font(.system(.largeTitle, design: .rounded, weight: .light))
+                                .foregroundStyle(Theme.textSecondary.opacity(0.4))
 
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Text("Add Server")
-                            .font(.system(.body, design: .rounded, weight: .medium))
-                            .foregroundStyle(Theme.background)
-                            .padding(.horizontal, Theme.spacing * 3)
-                            .padding(.vertical, Theme.spacing * 1.5)
-                            .background(Theme.accent, in: Capsule())
+                            Text("Connect to your server to get started.")
+                                .font(Theme.body)
+                                .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                                .multilineTextAlignment(.center)
+
+                            Button {
+                                showSettings = true
+                            } label: {
+                                Text("Add Server")
+                                    .font(.system(.body, design: .rounded, weight: .medium))
+                                    .foregroundStyle(Theme.background)
+                                    .padding(.horizontal, Theme.spacing * 3)
+                                    .padding(.vertical, Theme.spacing * 1.5)
+                                    .background(Theme.accent, in: Capsule())
+                            }
+
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-
-                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
             } else if let room = selectedRoom {
                 // Room chat mode
                 VStack(spacing: 0) {
@@ -358,6 +366,11 @@ struct ChatView: View {
                 showNotificationPrompt = true
             }
         }
+        .onChange(of: selectedRoom?.id) { _, newRoomId in
+            if newRoomId != nil {
+                ensureRoomServiceConnected()
+            }
+        }
         .onAppear {
             speechRecognizer.requestAuthorization()
             if chatService.hasServer {
@@ -378,11 +391,29 @@ struct ChatView: View {
         .preferredColorScheme(.dark)
     }
 
+    // MARK: - Lobby
+
+    private static let lobbyRoom = Room(
+        id: "lobby",
+        name: "Lobby",
+        emoji: "🏠",
+        isPublic: true
+    )
+
+    /// Rooms to show in the picker: user's rooms + lobby (always present)
+    private var pickerRooms: [Room] {
+        var result = roomService.rooms
+        if !result.contains(where: { $0.id == Self.lobbyRoom.id }) {
+            result.append(Self.lobbyRoom)
+        }
+        return result
+    }
+
     // MARK: - Picker Section
 
     @ViewBuilder
     private var pickerSection: some View {
-        let showPicker = chatService.visibleAgents.count > 1 || !roomService.rooms.isEmpty
+        let showPicker = chatService.visibleAgents.count > 1 || !pickerRooms.isEmpty
         if showPicker {
             ScrollView(.horizontal, showsIndicators: false) {
                 AgentPicker(
@@ -392,7 +423,7 @@ struct ChatView: View {
                     ),
                     agents: chatService.visibleAgents,
                     unreadAgentIds: chatService.unreadAgentIds,
-                    rooms: roomService.rooms,
+                    rooms: pickerRooms,
                     selectedRoom: $selectedRoom
                 )
                 .padding(.horizontal, 16)
@@ -451,6 +482,16 @@ struct ChatView: View {
     }
 
     // MARK: - Actions
+
+    private static let productionBackendURL = "claudio-server-production.up.railway.app"
+
+    private func ensureRoomServiceConnected() {
+        guard !roomService.isConnected else { return }
+        if !roomService.hasBackend {
+            roomService.backendURL = Self.productionBackendURL
+        }
+        roomService.connect()
+    }
 
     private func scrollToBottom(proxy: ScrollViewProxy) {
         if let lastMessage = chatService.messages.last {

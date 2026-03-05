@@ -134,11 +134,53 @@ final class RoomService {
     }
 
     @MainActor
-    func createRoom(name: String, emoji: String) async -> Room? {
+    func fetchPublicRooms() async -> [Room] {
+        do {
+            let response = try await webSocketClient.send(method: "rooms.listPublic")
+            guard response.ok, let payload = response.payload,
+                  let roomsArr = payload["rooms"]?.arrayValue else {
+                log.error("fetchPublicRooms: invalid response")
+                return []
+            }
+            return roomsArr.compactMap { Room(from: $0) }
+        } catch {
+            log.error("fetchPublicRooms: \(error)")
+            return []
+        }
+    }
+
+    @MainActor
+    func joinPublicRoom(roomId: String) async -> Room? {
+        do {
+            let params: [String: AnyCodableValue] = ["roomId": .string(roomId)]
+            let response = try await webSocketClient.send(method: "rooms.join", params: params)
+            guard response.ok, let payload = response.payload,
+                  let roomValue = payload["room"] else {
+                log.error("joinPublicRoom: invalid response")
+                return nil
+            }
+            if let room = Room(from: roomValue) {
+                if !rooms.contains(where: { $0.id == room.id }) {
+                    rooms.insert(room, at: 0)
+                }
+                log.info("joinPublicRoom: \(room.name)")
+                return room
+            }
+        } catch {
+            log.error("joinPublicRoom: \(error)")
+        }
+        return nil
+    }
+
+    @MainActor
+    func createRoom(name: String, emoji: String, isPublic: Bool = false) async -> Room? {
         do {
             var params: [String: AnyCodableValue] = ["name": .string(name)]
             if !emoji.isEmpty {
                 params["emoji"] = .string(emoji)
+            }
+            if isPublic {
+                params["public"] = .bool(true)
             }
             let response = try await webSocketClient.send(method: "rooms.create", params: params)
             guard response.ok, let payload = response.payload,

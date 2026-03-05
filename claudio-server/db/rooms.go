@@ -46,6 +46,38 @@ func nanoid() string {
 	return hex.EncodeToString(b)[:12]
 }
 
+const LobbyRoomID = "lobby"
+
+// EnsureLobby creates the default public lobby room if it doesn't already exist.
+func (db *DB) EnsureLobby() error {
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM rooms WHERE id = ?`, LobbyRoomID).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	// Ensure system user exists (needed for foreign key on created_by)
+	_, _ = db.Exec(`
+		INSERT OR IGNORE INTO users (id, public_key, display_name, avatar_emoji)
+		VALUES ('system', 'system', 'System', '🤖')
+	`)
+
+	now := time.Now().UTC()
+	_, err = db.Exec(`
+		INSERT INTO rooms (id, name, emoji, created_by, public, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, LobbyRoomID, "Lobby", "🏠", "system", true, now, now)
+	return err
+}
+
+// EnsureLobbyAgent adds a default agent to the lobby if not already present.
+func (db *DB) EnsureLobbyAgent(agentID, openclawURL, openclawToken, agentName, agentEmoji string) error {
+	return db.AddAgentParticipant(LobbyRoomID, agentID, openclawURL, openclawToken, agentName, agentEmoji)
+}
+
 func (db *DB) CreateRoom(name, emoji, createdBy string, public bool) (*Room, error) {
 	id := nanoid()
 	now := time.Now().UTC()
