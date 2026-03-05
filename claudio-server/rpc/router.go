@@ -15,8 +15,8 @@ type Router struct {
 	OpenClawPool *openclaw.Pool
 }
 
-func NewRouter(hub *ws.Hub, database *db.DB) *Router {
-	r := &Router{Hub: hub, DB: database, OpenClawPool: openclaw.NewPool()}
+func NewRouter(hub *ws.Hub, database *db.DB, keyDir string) *Router {
+	r := &Router{Hub: hub, DB: database, OpenClawPool: openclaw.NewPool(keyDir)}
 	hub.RPCRouter = r.Handle
 	return r
 }

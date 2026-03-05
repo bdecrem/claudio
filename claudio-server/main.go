@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -52,7 +53,8 @@ func main() {
 	}
 
 	hub := ws.NewHub(database)
-	router := rpc.NewRouter(hub, database)
+	keyDir := filepath.Dir(cfg.DBPath)
+	router := rpc.NewRouter(hub, database, keyDir)
 	router.ExternalURL = cfg.ExternalURL
 
 	go hub.Run()
