@@ -62,7 +62,10 @@ func NewClient(url, token string) *Client {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	hash := sha256.Sum256(pub)
 	deviceID := hex.EncodeToString(hash[:])
+	return NewClientWithIdentity(url, token, priv, pub, deviceID)
+}
 
+func NewClientWithIdentity(url, token string, priv ed25519.PrivateKey, pub ed25519.PublicKey, deviceID string) *Client {
 	return &Client{
 		url:        url,
 		token:      token,
