@@ -14,7 +14,9 @@ struct ChatView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var showPhotoPicker = false
     @State private var selectedRoom: Room?
+    @State private var showLobby = false
     @State private var showNotificationPrompt = false
+    @State private var showRoomSettings = false
 
     var body: some View {
         ZStack {
@@ -22,60 +24,89 @@ struct ChatView: View {
                 .ignoresSafeArea()
 
             if !chatService.hasServer {
+                // No server — onboarding
                 VStack(spacing: 0) {
-                    pickerSection
-
-                    if let room = selectedRoom {
-                        RoomChatView(roomService: roomService, chatService: chatService, room: room)
-                    } else {
-                        VStack(spacing: Theme.spacing * 3) {
-                            Spacer()
-
-                            Text("claudio")
-                                .font(.system(.largeTitle, design: .rounded, weight: .light))
-                                .foregroundStyle(Theme.textSecondary.opacity(0.4))
-
-                            Text("Connect to your server to get started.")
-                                .font(Theme.body)
-                                .foregroundStyle(Theme.textSecondary.opacity(0.6))
-                                .multilineTextAlignment(.center)
-
-                            Button {
-                                showSettings = true
-                            } label: {
-                                Text("Add Server")
-                                    .font(.system(.body, design: .rounded, weight: .medium))
-                                    .foregroundStyle(Theme.background)
-                                    .padding(.horizontal, Theme.spacing * 3)
-                                    .padding(.vertical, Theme.spacing * 1.5)
-                                    .background(Theme.accent, in: Capsule())
-                            }
-
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
+                    HStack {
+                        Spacer()
+                        lobbyButton
+                        settingsButton
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 10)
+
+                    Theme.border.frame(height: 1)
+
+                    VStack(spacing: Theme.spacing * 3) {
+                        Spacer()
+
+                        Text("claudio")
+                            .font(.system(.largeTitle, design: .rounded, weight: .light))
+                            .foregroundStyle(Theme.textSecondary.opacity(0.4))
+
+                        Text("Connect to your server to get started.")
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Text("Add Server")
+                                .font(.system(.body, design: .rounded, weight: .medium))
+                                .foregroundStyle(Theme.background)
+                                .padding(.horizontal, Theme.spacing * 3)
+                                .padding(.vertical, Theme.spacing * 1.5)
+                                .background(Theme.accent, in: Capsule())
+                        }
+
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             } else if let room = selectedRoom {
-                // Room chat mode
+                // Room chat mode (inline, only when picker row is active)
                 VStack(spacing: 0) {
-                    // Agent/room picker
-                    pickerSection
+                    // Header — matches agent header layout
+                    VStack(spacing: 0) {
+                        ZStack {
+                            VStack(spacing: 2) {
+                                Text(room.name)
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("\(roomService.activeRoom?.participants.count ?? 0) participants")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
 
-                    RoomChatView(roomService: roomService, chatService: chatService, room: room)
+                            HStack {
+                                Spacer()
+                                settingsButton
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 10)
+
+                        Theme.border.frame(height: 1)
+                    }
+
+                    pickerSection
+                    RoomChatView(
+                        roomService: roomService,
+                        chatService: chatService,
+                        room: room,
+                        hideHeader: true,
+                        onOpenSettings: { showRoomSettings = true }
+                    )
                 }
             } else {
                 // Agent chat mode
                 VStack(spacing: 0) {
                     // Header
                     VStack(spacing: 0) {
-                        HStack {
-                            Spacer()
-                                .frame(width: 32)
-
-                            Spacer()
-
-                            // Centered agent name
+                        ZStack {
+                            // Title: centered to full screen width
                             VStack(spacing: 2) {
                                 Text(currentAgentName)
                                     .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -93,33 +124,31 @@ struct ChatView: View {
                                 }
                             }
 
-                            Spacer()
+                            // Icons: pinned to trailing edge
+                            HStack {
+                                Spacer()
 
-                            Button {
-                                showSettings = true
-                            } label: {
-                                Image(systemName: "gearshape")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(Theme.textSecondary)
-                                    .padding(6)
-                                    .hoverEffect(.lift)
-                            }
-                            .keyboardShortcut(",", modifiers: .command)
-                            .contextMenu {
-                                if chatService.savedServers.count > 1 {
-                                    ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
-                                        let name = server.nickname.isEmpty ? serverDisplayName(for: server.url) : server.nickname
-                                        Button {
-                                            chatService.switchServer(to: index)
-                                        } label: {
-                                            if index == chatService.activeServerIndex {
-                                                Label(name, systemImage: "checkmark")
-                                            } else {
-                                                Text(name)
+                                if !needsPickerRow {
+                                    lobbyButton
+                                }
+
+                                settingsButton
+                                    .contextMenu {
+                                        if chatService.savedServers.count > 1 {
+                                            ForEach(Array(chatService.savedServers.enumerated()), id: \.offset) { index, server in
+                                                let name = server.nickname.isEmpty ? serverDisplayName(for: server.url) : server.nickname
+                                                Button {
+                                                    chatService.switchServer(to: index)
+                                                } label: {
+                                                    if index == chatService.activeServerIndex {
+                                                        Label(name, systemImage: "checkmark")
+                                                    } else {
+                                                        Text(name)
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -129,7 +158,7 @@ struct ChatView: View {
                         Theme.border.frame(height: 1)
                     }
 
-                    // Agent/room picker
+                    // Agent/room picker (only when multiple agents or joined rooms)
                     pickerSection
 
                     // Messages with fade edges
@@ -288,6 +317,50 @@ struct ChatView: View {
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
+                    // Pairing required banner
+                    if chatService.wsConnectionState == .pairingRequired {
+                        VStack(spacing: 12) {
+                            Image(systemName: "lock.shield")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Theme.accent)
+
+                            Text("Device Pairing Required")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundStyle(Theme.textPrimary)
+
+                            Text("On your server, run:")
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(Theme.textSecondary)
+
+                            Text("openclaw devices approve")
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Theme.accent)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Theme.surface)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(Theme.border, lineWidth: 1)
+                                )
+
+                            Button {
+                                chatService.retryConnection()
+                            } label: {
+                                Text("Retry")
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Theme.background)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 10)
+                                    .background(Theme.accent, in: Capsule())
+                            }
+                            .padding(.top, 4)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Theme.background)
+                    }
+
                     // Input
                     InputBar(
                         text: $messageText,
@@ -329,7 +402,30 @@ struct ChatView: View {
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 500, maxHeight: .infinity)
         .background(Theme.background)
         .sheet(isPresented: $showSettings) {
-            SettingsView(chatService: chatService, roomService: roomService)
+            SettingsView(chatService: chatService, roomService: roomService) {
+                ensureRoomServiceConnected()
+                showLobby = true
+            }
+        }
+        .sheet(isPresented: $showRoomSettings) {
+            if let room = selectedRoom {
+                RoomSettingsView(roomService: roomService, chatService: chatService, room: room, onLeave: {
+                    selectedRoom = nil
+                    showRoomSettings = false
+                })
+            }
+        }
+        .sheet(isPresented: $showLobby) {
+            RoomChatView(
+                roomService: roomService,
+                chatService: chatService,
+                room: Self.lobbyRoom,
+                isModal: true,
+                onDismiss: { showLobby = false },
+                displayNameOverride: "The Lounge"
+            )
+            .background(Theme.background)
+            .preferredColorScheme(.dark)
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 4, matching: .images)
         .onChange(of: selectedPhotos) { _, items in
@@ -395,26 +491,40 @@ struct ChatView: View {
 
     private static let lobbyRoom = Room(
         id: "lobby",
-        name: "Lobby",
-        emoji: "🏠",
+        name: "The Lounge",
+        emoji: nil,
         isPublic: true
     )
 
-    /// Rooms to show in the picker: user's rooms + lobby (always present)
+    /// Rooms the user has explicitly joined (not counting lobby)
+    private var joinedRooms: [Room] {
+        roomService.rooms.filter { $0.id != Self.lobbyRoom.id }
+    }
+
+    /// Rooms to show in the picker: user's rooms + lobby (always without emoji)
     private var pickerRooms: [Room] {
-        var result = roomService.rooms
+        var result = roomService.rooms.map { room in
+            if room.id == Self.lobbyRoom.id {
+                return Room(id: room.id, name: room.name, emoji: nil, isPublic: room.isPublic)
+            }
+            return room
+        }
         if !result.contains(where: { $0.id == Self.lobbyRoom.id }) {
             result.append(Self.lobbyRoom)
         }
         return result
     }
 
+    /// Whether to show the full pill-row picker (multiple agents or any joined rooms)
+    private var needsPickerRow: Bool {
+        chatService.visibleAgents.count > 1 || !joinedRooms.isEmpty
+    }
+
     // MARK: - Picker Section
 
     @ViewBuilder
     private var pickerSection: some View {
-        let showPicker = chatService.visibleAgents.count > 1 || !pickerRooms.isEmpty
-        if showPicker {
+        if needsPickerRow {
             ScrollView(.horizontal, showsIndicators: false) {
                 AgentPicker(
                     selected: Binding(
@@ -433,6 +543,33 @@ struct ChatView: View {
                 Color.white.opacity(0.03).frame(height: 1)
             }
         }
+    }
+
+    // MARK: - Top Bar Buttons
+
+    private var lobbyButton: some View {
+        Button {
+            ensureRoomServiceConnected()
+            showLobby = true
+        } label: {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.textSecondary)
+                .padding(6)
+        }
+    }
+
+    private var settingsButton: some View {
+        Button {
+            showSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 18))
+                .foregroundStyle(Theme.textSecondary)
+                .padding(6)
+                .hoverEffect(.lift)
+        }
+        .keyboardShortcut(",", modifiers: .command)
     }
 
     // MARK: - Computed Properties

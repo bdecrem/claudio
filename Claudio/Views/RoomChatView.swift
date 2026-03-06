@@ -4,6 +4,11 @@ struct RoomChatView: View {
     let roomService: RoomService
     let chatService: ChatService
     let room: Room
+    var isModal: Bool = false
+    var hideHeader: Bool = false
+    var onDismiss: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
+    var displayNameOverride: String?
 
     @State private var messageText = ""
     @State private var showSettings = false
@@ -20,7 +25,9 @@ struct RoomChatView: View {
         ZStack {
             VStack(spacing: 0) {
                 // Header
-                roomHeader
+                if !hideHeader {
+                    roomHeader
+                }
 
                 // Messages
                 ZStack {
@@ -104,21 +111,38 @@ struct RoomChatView: View {
 
     // MARK: - Header
 
+    private var headerTitle: String {
+        displayNameOverride ?? room.name
+    }
+
     private var roomHeader: some View {
         VStack(spacing: 0) {
             HStack {
-                Spacer()
-                    .frame(width: 32)
+                if isModal {
+                    Button { onDismiss?() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.textSecondary.opacity(0.7))
+                            .frame(width: 28, height: 28)
+                            .background(Theme.surface, in: Circle())
+                    }
+                } else {
+                    Spacer().frame(width: 32)
+                }
 
                 Spacer()
 
                 VStack(spacing: 2) {
-                    HStack(spacing: 6) {
-                        if let emoji = room.emoji {
+                    if !isModal, let emoji = room.emoji {
+                        HStack(spacing: 6) {
                             Text(emoji)
                                 .font(.system(size: 16))
+                            Text(headerTitle)
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Theme.textPrimary)
                         }
-                        Text(room.name)
+                    } else {
+                        Text(headerTitle)
                             .font(.system(size: 13, weight: .medium, design: .monospaced))
                             .foregroundStyle(Theme.textPrimary)
                     }
@@ -130,8 +154,8 @@ struct RoomChatView: View {
                 Spacer()
 
                 Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 18))
+                    Image(systemName: isModal ? "ellipsis" : "gearshape")
+                        .font(.system(size: isModal ? 16 : 18))
                         .foregroundStyle(Theme.textSecondary)
                         .padding(6)
                 }
@@ -149,6 +173,26 @@ struct RoomChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
+                // Mini banner for room settings (inline mode)
+                if let onOpenSettings {
+                    Button { onOpenSettings() } label: {
+                        HStack(spacing: 6) {
+                            Text("\(displayRoom.participants.count) participants")
+                                .font(.system(size: 11, design: .monospaced))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                }
+
                 if roomService.activeRoomMessages.isEmpty {
                     VStack(spacing: Theme.spacing * 2) {
                         Spacer(minLength: 100)
@@ -174,7 +218,7 @@ struct RoomChatView: View {
                     .padding(.vertical, 16)
                 }
             }
-            .contentMargins(.top, 60, for: .scrollContent)
+            .contentMargins(.top, hideHeader ? 8 : 60, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
             .onChange(of: roomService.activeRoomMessages.count) {

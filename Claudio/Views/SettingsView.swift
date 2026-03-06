@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let chatService: ChatService
     var roomService: RoomService?
+    var onJoinLobby: (() -> Void)?
 
     @State private var editingIndex: Int?
     @State private var editURL = ""
@@ -31,30 +32,44 @@ struct SettingsView: View {
                     // MARK: - Servers
                     if chatService.savedServers.isEmpty {
                         SettingsSection(title: "Servers") {
-                            Button {
-                                editingIndex = -1
-                                editURL = ""
-                                editToken = ""
-                                editNickname = ""
-                            } label: {
-                                VStack(spacing: 10) {
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 28, weight: .medium))
-                                        .foregroundStyle(Theme.accent)
-                                    Text("Add Server")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(Theme.accent.opacity(0.7))
+                            VStack(spacing: 12) {
+                                Button {
+                                    editingIndex = -1
+                                    editURL = ""
+                                    editToken = ""
+                                    editNickname = ""
+                                } label: {
+                                    VStack(spacing: 10) {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 28, weight: .medium))
+                                            .foregroundStyle(Theme.accent)
+                                        Text("Add Server")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Theme.accent.opacity(0.7))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 28)
+                                    .background(Theme.accent.opacity(0.06))
+                                    .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                                            .strokeBorder(Theme.accent.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                                    )
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 28)
-                                .background(Theme.accent.opacity(0.06))
-                                .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
-                                        .strokeBorder(Theme.accent.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                                )
+                                .buttonStyle(.plain)
+
+                                if onJoinLobby != nil {
+                                    Button {
+                                        dismiss()
+                                        onJoinLobby?()
+                                    } label: {
+                                        Text("Need help? Chat in the Lobby")
+                                            .font(.system(size: 13, design: .rounded))
+                                            .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
-                            .buttonStyle(.plain)
                         }
                     } else {
                         SettingsSection(title: "Servers") {
@@ -509,7 +524,11 @@ struct SettingsView: View {
                         }
                         editingIndex = nil
                     },
-                    onCancel: { editingIndex = nil }
+                    onCancel: { editingIndex = nil },
+                    onRemove: index == -1 ? nil : {
+                        chatService.removeServer(at: index)
+                        editingIndex = nil
+                    }
                 )
             }
         }
@@ -595,6 +614,7 @@ private struct ServerEditSheet: View {
     @Binding var nickname: String
     let onSave: () -> Void
     let onCancel: () -> Void
+    var onRemove: (() -> Void)?
 
     var body: some View {
         NavigationStack {
@@ -671,6 +691,23 @@ private struct ServerEditSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
+
+                if let onRemove {
+                    Button(role: .destructive) {
+                        onRemove()
+                    } label: {
+                        Text("Remove Server")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.danger)
+                            .frame(maxWidth: .infinity)
+                            .padding(14)
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                }
             }
             .background(Theme.background)
             .navigationTitle(isNew ? "Add Server" : "Edit Server")
