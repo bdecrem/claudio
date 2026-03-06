@@ -189,6 +189,17 @@ actor WebSocketClient {
             return
         }
 
+        // Clean up any existing connection
+        keepaliveTask?.cancel()
+        keepaliveTask = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+        cancelAllPending(error: WebSocketError.disconnected)
+        webSocketTask?.cancel(with: .goingAway, reason: nil)
+        webSocketTask = nil
+        urlSession?.invalidateAndCancel()
+        urlSession = nil
+
         setState(.connecting)
 
         // Build WebSocket URL
@@ -227,10 +238,10 @@ actor WebSocketClient {
                 let message = try await task.receive()
                 switch message {
                 case .string(let text):
-                    await handleMessage(text)
+                    handleMessage(text)
                 case .data(let data):
                     if let text = String(data: data, encoding: .utf8) {
-                        await handleMessage(text)
+                        handleMessage(text)
                     }
                 @unknown default:
                     break
@@ -245,7 +256,7 @@ actor WebSocketClient {
         }
     }
 
-    private func handleMessage(_ text: String) async {
+    private func handleMessage(_ text: String) {
         guard let data = text.data(using: .utf8) else { return }
 
         // Try to determine message type
@@ -271,7 +282,7 @@ actor WebSocketClient {
                     let preview = text.prefix(500)
                     log.info("RAW \(event.event): \(preview)")
                 }
-                await handleEvent(event)
+                handleEvent(event)
             }
 
         default:
@@ -293,7 +304,7 @@ actor WebSocketClient {
         }
     }
 
-    private func handleEvent(_ event: RPCEvent) async {
+    private func handleEvent(_ event: RPCEvent) {
         switch event.event {
         case "connect.challenge":
             handleChallenge(event.payload)
@@ -304,20 +315,20 @@ actor WebSocketClient {
         case "chat":
             if let chatEvent = ChatEvent(from: event.payload) {
                 if let handler = onChatEvent {
-                    await handler(chatEvent)
+                    Task { @MainActor in handler(chatEvent) }
                 }
             }
 
         case "agent":
             if let agentEvent = AgentEvent(from: event.payload) {
                 if let handler = onAgentEvent {
-                    await handler(agentEvent)
+                    Task { @MainActor in handler(agentEvent) }
                 }
             }
 
         case _ where event.event.hasPrefix("room."):
             if let handler = onRoomEvent {
-                await handler(event.event, event.payload)
+                Task { @MainActor in handler(event.event, event.payload) }
             }
 
         default:
@@ -418,7 +429,7 @@ actor WebSocketClient {
             setState(.connected)
             startKeepalive()
 
-            log.info("Connected successfully")
+            log.info("Connected successfully (tickInterval=\(self.tickIntervalMs)ms)")
         } else {
             let errorCode = response.error?.code ?? ""
             let errorMsg = response.error?.message ?? "Connection failed"
@@ -443,10 +454,10 @@ actor WebSocketClient {
                 guard !Task.isCancelled else { break }
 
                 let elapsed = Date().timeIntervalSince(lastTickTime)
-                let threshold = Double(tickIntervalMs) * 2.0 / 1000.0
+                let threshold = Double(tickIntervalMs) * 3.0 / 1000.0
 
                 if elapsed > threshold {
-                    log.warning("Tick timeout (\(Int(elapsed))s), reconnecting")
+                    log.warning("Tick timeout (\(Int(elapsed))s, threshold=\(Int(threshold))s), reconnecting")
                     await handleDisconnect()
                     break
                 }

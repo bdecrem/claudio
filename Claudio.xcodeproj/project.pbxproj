@@ -16,6 +16,7 @@
 		A10000010000000000000007 /* VoiceOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000007 /* VoiceOrb.swift */; };
 		A10000010000000000000008 /* AgentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000008 /* AgentPicker.swift */; };
 		A10000010000000000000009 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* SettingsView.swift */; };
+		QR0000010000000000000001 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = QR0000020000000000000001 /* QRScannerView.swift */; };
 		A1000001000000000000000A /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000A /* SpeechRecognizer.swift */; };
 		A1000001000000000000000B /* HapticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000B /* HapticsManager.swift */; };
 		A1000001000000000000000C /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000001000000000000000C /* Theme.swift */; };
@@ -60,6 +61,7 @@
 		A20000010000000000000007 /* VoiceOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOrb.swift; sourceTree = "<group>"; };
 		A20000010000000000000008 /* AgentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPicker.swift; sourceTree = "<group>"; };
 		A20000010000000000000009 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		QR0000020000000000000001 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 		A2000001000000000000000A /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
 		A2000001000000000000000B /* HapticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticsManager.swift; sourceTree = "<group>"; };
 		A2000001000000000000000C /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 				A20000010000000000000007 /* VoiceOrb.swift */,
 				A20000010000000000000008 /* AgentPicker.swift */,
 				A20000010000000000000009 /* SettingsView.swift */,
+				QR0000020000000000000001 /* QRScannerView.swift */,
 				A2000001000000000000000E /* LaunchScreen.swift */,
 				B20000010000000000000002 /* VoiceSessionView.swift */,
 				F20000010000000000000001 /* ToolCallCard.swift */,
@@ -346,6 +349,7 @@
 				A10000010000000000000007 /* VoiceOrb.swift in Sources */,
 				A10000010000000000000008 /* AgentPicker.swift in Sources */,
 				A10000010000000000000009 /* SettingsView.swift in Sources */,
+				QR0000010000000000000001 /* QRScannerView.swift in Sources */,
 				A1000001000000000000000A /* SpeechRecognizer.swift in Sources */,
 				A1000001000000000000000B /* HapticsManager.swift in Sources */,
 				A1000001000000000000000C /* Theme.swift in Sources */,

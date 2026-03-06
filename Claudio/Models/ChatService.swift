@@ -195,6 +195,11 @@ final class ChatService {
         connectWebSocket()
     }
 
+    func retryConnection() {
+        connectionError = nil
+        connectWebSocket()
+    }
+
     /// Find the server for a given agent
     func server(for agent: Agent) -> Server? {
         guard savedServers.indices.contains(agent.serverIndex) else { return nil }
@@ -258,7 +263,7 @@ final class ChatService {
                     Task { await self.onWebSocketConnected() }
 
                 case .pairingRequired:
-                    self.connectionError = "Device pairing required. Approve this device on your server."
+                    self.connectionError = "Device pairing required. On your server, run:\nopenclaw devices approve"
                     self.agentFetchFailed = true
 
                 case .error(let msg):

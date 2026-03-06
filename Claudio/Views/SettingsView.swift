@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var dangerousTogglePending = false
     @State private var showDangerousConfirm = false
     @State private var dangerousExpanded = false
+    @State private var showQRScanner = false
 
     private let cardRadius: CGFloat = 14
 
@@ -55,6 +56,15 @@ struct SettingsView: View {
                                         RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
                                             .strokeBorder(Theme.accent.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
                                     )
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    showQRScanner = true
+                                } label: {
+                                    Text("Login with QR")
+                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(Theme.accent)
                                 }
                                 .buttonStyle(.plain)
 
@@ -531,6 +541,16 @@ struct SettingsView: View {
                     }
                 )
             }
+        }
+        .fullScreenCover(isPresented: $showQRScanner) {
+            QRScannerView(
+                onScanned: { url, token in
+                    chatService.addServer(url: url, token: token)
+                    showQRScanner = false
+                    dismiss()
+                },
+                onCancel: { showQRScanner = false }
+            )
         }
         .onAppear {
             if chatService.hasServer && !chatService.isConnected {
