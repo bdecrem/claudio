@@ -90,7 +90,10 @@ struct QRScannerView: View {
     }
 
     private func decodeQR(_ raw: String) -> (url: String, token: String)? {
-        guard let data = Data(base64Encoded: raw),
+        // Pad base64 if needed — OpenClaw QR codes may omit trailing '='
+        var b64 = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        while b64.count % 4 != 0 { b64.append("=") }
+        guard let data = Data(base64Encoded: b64),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let url = json["url"] as? String,
               let token = json["token"] as? String else {
