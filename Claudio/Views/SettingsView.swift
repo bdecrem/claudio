@@ -68,6 +68,11 @@ struct SettingsView: View {
                                 }
                                 .buttonStyle(.plain)
 
+
+                                Text("Type \"openclaw qr\" in your terminal to generate a QR code")
+                                    .font(.system(size: 13, design: .rounded))
+                                    .foregroundStyle(Theme.textSecondary.opacity(0.6))
+
                                 if onJoinLobby != nil {
                                     Button {
                                         dismiss()
