@@ -6,39 +6,48 @@ struct QRScannerView: View {
     let onCancel: () -> Void
 
     @State private var error: String?
+    @State private var cameraAuthorized = false
+    @State private var permissionDenied = false
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            QRCameraView { code in
-                guard let (url, token) = decodeQR(code) else {
-                    error = "This doesn't look like an OpenClaw QR code. Make sure you're scanning the code from `openclaw qr`."
-                    return
+            if cameraAuthorized {
+                QRCameraView { code in
+                    guard let (url, token) = decodeQR(code) else {
+                        error = "This doesn't look like an OpenClaw QR code. Make sure you're scanning the code from `openclaw qr`."
+                        return
+                    }
+                    onScanned(url, token)
                 }
-                onScanned(url, token)
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
 
             VStack {
                 HStack {
                     Spacer()
-                    Button {
-                        onCancel()
-                    } label: {
+                    Button { onCancel() } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
                             .foregroundStyle(.white.opacity(0.7))
                     }
                     .padding()
                 }
-
                 Spacer()
 
-                Text("Point at QR code on your computer")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(.bottom, 60)
+                if permissionDenied {
+                    Text("Camera access is needed to scan QR codes.\nEnable it in Settings > Claudio.")
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.bottom, 60)
+                } else if cameraAuthorized {
+                    Text("Point at QR code on your computer")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.bottom, 60)
+                }
             }
 
             if let error {
@@ -60,6 +69,23 @@ struct QRScannerView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .padding(32)
             }
+        }
+        .task {
+            await requestCameraAccess()
+        }
+    }
+
+    private func requestCameraAccess() async {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            cameraAuthorized = true
+        case .notDetermined:
+            let granted = await AVCaptureDevice.requestAccess(for: .video)
+            cameraAuthorized = granted
+            permissionDenied = !granted
+        default:
+            permissionDenied = true
         }
     }
 
