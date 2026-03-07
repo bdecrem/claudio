@@ -34,6 +34,14 @@ func main() {
 	}
 	defer database.Close()
 
+	// One-time migration: clear stale push watches so devices re-register with new token
+	if res, err := database.Exec("DELETE FROM push_watches"); err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			slog.Info("cleared stale push watches", "count", n)
+		}
+	}
+
+
 	if err := database.EnsureLobby(); err != nil {
 		slog.Error("failed to create lobby room", "err", err)
 	}
