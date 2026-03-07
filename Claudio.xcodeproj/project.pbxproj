@@ -29,6 +29,7 @@
 		E10000010000000000000001 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000001 /* DeviceIdentity.swift */; };
 		E10000010000000000000002 /* RPCTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000002 /* RPCTypes.swift */; };
 		E10000010000000000000003 /* WebSocketClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000003 /* WebSocketClient.swift */; };
+		E10000010000000000000004 /* HTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000010000000000000004 /* HTTPTransport.swift */; };
 		F10000010000000000000001 /* ToolCallCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000001 /* ToolCallCard.swift */; };
 		N10000010000000000000001 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000001 /* NotificationService.swift */; };
 		N10000010000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000010000000000000002 /* AppDelegate.swift */; };
@@ -76,6 +77,7 @@
 		E20000010000000000000001 /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		E20000010000000000000002 /* RPCTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RPCTypes.swift; sourceTree = "<group>"; };
 		E20000010000000000000003 /* WebSocketClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSocketClient.swift; sourceTree = "<group>"; };
+		E20000010000000000000004 /* HTTPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTransport.swift; sourceTree = "<group>"; };
 		F20000010000000000000001 /* ToolCallCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolCallCard.swift; sourceTree = "<group>"; };
 		N20000010000000000000001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		N20000010000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -200,6 +202,7 @@
 				C20000010000000000000001 /* ChaosService.swift */,
 				E20000010000000000000001 /* DeviceIdentity.swift */,
 				E20000010000000000000003 /* WebSocketClient.swift */,
+				E20000010000000000000004 /* HTTPTransport.swift */,
 				N20000010000000000000001 /* NotificationService.swift */,
 				N20000010000000000000002 /* AppDelegate.swift */,
 				G20000010000000000000002 /* RoomService.swift */,
@@ -360,6 +363,7 @@
 				E10000010000000000000001 /* DeviceIdentity.swift in Sources */,
 				E10000010000000000000002 /* RPCTypes.swift in Sources */,
 				E10000010000000000000003 /* WebSocketClient.swift in Sources */,
+				E10000010000000000000004 /* HTTPTransport.swift in Sources */,
 				F10000010000000000000001 /* ToolCallCard.swift in Sources */,
 				N10000010000000000000001 /* NotificationService.swift in Sources */,
 				N10000010000000000000002 /* AppDelegate.swift in Sources */,

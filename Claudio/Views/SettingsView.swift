@@ -220,6 +220,37 @@ struct SettingsView: View {
                         }
                     }
 
+                    // MARK: - Connection Mode
+                    if chatService.hasServer {
+                        SettingsSection(title: "Connection Mode") {
+                            VStack(spacing: 0) {
+                                connectionModeRow(
+                                    title: "Standard (HTTP)",
+                                    subtitle: "More reliable on mobile",
+                                    isSelected: chatService.connectionMode == .http
+                                ) {
+                                    chatService.connectionMode = .http
+                                    chatService.retryConnection()
+                                }
+
+                                Divider()
+                                    .background(Theme.border)
+                                    .padding(.leading, 16)
+
+                                connectionModeRow(
+                                    title: "Advanced (WebSocket)",
+                                    subtitle: "Live tool updates, real-time push",
+                                    isSelected: chatService.connectionMode == .websocket
+                                ) {
+                                    chatService.connectionMode = .websocket
+                                    chatService.retryConnection()
+                                }
+                            }
+                            .background(Theme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
+                        }
+                    }
+
                     // MARK: - Notifications
                     NotificationSettingsSection(cardRadius: cardRadius)
 
@@ -578,6 +609,29 @@ struct SettingsView: View {
             Text("May introduce unexpected behavior. Claudio will not ask. Claudio will act.")
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func connectionModeRow(title: String, subtitle: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary.opacity(0.3))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15))
+                        .foregroundStyle(isSelected ? settingsText : Theme.textSecondary)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func displayName(for url: String) -> String {

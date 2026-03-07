@@ -17,6 +17,19 @@ final class ChatService {
         didSet { NotificationService.shared.updateBadgeCount(unreadAgentIds.count) }
     }
 
+    // MARK: - Connection Mode
+
+    enum ConnectionMode: String {
+        case http
+        case websocket
+    }
+
+    var connectionMode: ConnectionMode {
+        didSet {
+            UserDefaults.standard.set(connectionMode.rawValue, forKey: "connectionMode")
+        }
+    }
+
     // Per-agent chat history
     private var chatHistories: [String: [Message]] = [:]
     private var audioPlayer: AVAudioPlayer?
@@ -24,6 +37,7 @@ final class ChatService {
     private var queuedVoiceReplyAudio: [Data] = []
     private var pendingAgents: Set<String> = []
     private let webSocketClient = WebSocketClient()
+    private let httpTransport = HTTPTransport()
 
     // Streaming message tracking
     private var streamingMessageId: UUID?
@@ -105,12 +119,13 @@ final class ChatService {
     }
 
     var isConnected: Bool {
-        wsConnectionState == .connected
+        connectionMode == .http || wsConnectionState == .connected
     }
 
     init() {
         self.selectedAgent = UserDefaults.standard.string(forKey: "selectedAgent") ?? ""
         self.activeServerIndex = UserDefaults.standard.integer(forKey: "activeServerIndex")
+        self.connectionMode = ConnectionMode(rawValue: UserDefaults.standard.string(forKey: "connectionMode") ?? "") ?? .http
 
         if let hiddenData = UserDefaults.standard.data(forKey: "hiddenAgentIds"),
            let decoded = try? JSONDecoder().decode(Set<String>.self, from: hiddenData) {
@@ -244,7 +259,23 @@ final class ChatService {
             return
         }
 
-        log.info("connectWebSocket: \(server.url)")
+        log.info("connectWebSocket: mode=\(connectionMode.rawValue) \(server.url)")
+
+        // Configure HTTP transport regardless of mode (needed for URL conversion)
+        Task { await httpTransport.configure(serverURL: server.url, token: server.token) }
+
+        if connectionMode == .http {
+            // In HTTP mode, still connect WS briefly to fetch agents, then we're ready
+            Task {
+                if !callbacksReady {
+                    await setupWebSocketCallbacks()
+                    callbacksReady = true
+                }
+                await webSocketClient.connect(serverURL: server.url, token: server.token)
+            }
+            return
+        }
+
         Task {
             if !callbacksReady {
                 await setupWebSocketCallbacks()
@@ -598,10 +629,78 @@ final class ChatService {
         persistChatHistories()
 
         let compositeId = selectedAgent
-        let sessionKey = currentSessionKey
         pendingAgents.insert(compositeId)
         isLoading = isLoadingCurrentAgent
         pendingVoiceTTS = playVoice
+
+        if connectionMode == .http {
+            sendMessageViaHTTP(compositeId: compositeId)
+        } else {
+            sendMessageViaWS(content: content, compositeId: compositeId, imageAttachments: imageAttachments)
+        }
+    }
+
+    private func sendMessageViaHTTP(compositeId: String) {
+        // Build conversation history for stateless HTTP
+        let apiMessages = messages.map { $0.apiRepresentation }
+        let agentId = selectedAgentId
+
+        log.info("sendMessage[HTTP]: agentId=\(agentId) messages=\(apiMessages.count)")
+
+        Task {
+            do {
+                try await httpTransport.sendMessage(
+                    messages: apiMessages,
+                    agentId: agentId,
+                    onDelta: { [weak self] delta in
+                        guard let self else { return }
+                        if delta.isFinished {
+                            // Final
+                            if let msgId = self.streamingMessageId,
+                               let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                                self.messages[idx].content = delta.content ?? ""
+                                self.messages[idx].isStreaming = false
+                            } else if let content = delta.content {
+                                self.messages.append(Message(role: .assistant, content: content))
+                            }
+                            self.pendingAgents.remove(compositeId)
+                            self.isLoading = self.isLoadingCurrentAgent
+                            self.streamingMessageId = nil
+                            self.persistChatHistories()
+                        } else if let content = delta.content {
+                            // Streaming delta
+                            if let msgId = self.streamingMessageId,
+                               let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                                self.messages[idx].content = content
+                            } else {
+                                let placeholder = Message(role: .assistant, content: content, isStreaming: true)
+                                self.messages.append(placeholder)
+                                self.streamingMessageId = placeholder.id
+                            }
+                        }
+                    }
+                )
+            } catch {
+                log.error("sendMessage[HTTP] failed: \(error)")
+                await MainActor.run {
+                    // If we have a streaming message, mark it as error
+                    if let msgId = self.streamingMessageId,
+                       let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                        self.messages[idx].content = error.localizedDescription
+                        self.messages[idx].isStreaming = false
+                    }
+                    self.connectionError = error.localizedDescription
+                    self.pendingAgents.remove(compositeId)
+                    self.isLoading = self.isLoadingCurrentAgent
+                    self.streamingMessageId = nil
+                    self.pendingVoiceTTS = false
+                }
+            }
+        }
+    }
+
+    private func sendMessageViaWS(content: String, compositeId: String, imageAttachments: [ImageAttachment]) {
+        let sessionKey = currentSessionKey
 
         // Convert image attachments to base64 dicts for the wire
         let wireAttachments: [[String: String]] = imageAttachments.map { img in
@@ -612,13 +711,13 @@ final class ChatService {
             ]
         }
 
-        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count)")
+        log.info("sendMessage[WS]: sessionKey=\(sessionKey) attachments=\(wireAttachments.count)")
 
         Task {
             do {
                 _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content, attachments: wireAttachments)
             } catch {
-                log.error("sendMessage failed: \(error)")
+                log.error("sendMessage[WS] failed: \(error)")
                 await MainActor.run {
                     self.connectionError = error.localizedDescription
                     self.pendingAgents.remove(compositeId)
@@ -634,11 +733,26 @@ final class ChatService {
         serverURL: String,
         token: String,
         agentId: String,
-        messages: [[String: String]]
+        messages apiMessages: [[String: String]]
     ) async throws -> String {
         // Extract the last user message
-        guard let lastMessage = messages.last, let content = lastMessage["content"] else {
+        guard let lastMessage = apiMessages.last, let content = lastMessage["content"] else {
             throw WebSocketError.serverError("No message to send")
+        }
+
+        if connectionMode == .http {
+            // In HTTP mode, send directly and collect the full response
+            var fullText = ""
+            try await httpTransport.sendMessage(
+                messages: apiMessages,
+                agentId: agentId,
+                onDelta: { delta in
+                    if let content = delta.content {
+                        fullText = content
+                    }
+                }
+            )
+            return fullText
         }
 
         return try await withCheckedThrowingContinuation { continuation in
