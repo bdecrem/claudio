@@ -182,10 +182,18 @@ final class ChatService {
     }
 
     func removeServer(at index: Int) {
-        guard savedServers.indices.contains(index), index != activeServerIndex else { return }
+        guard savedServers.indices.contains(index) else { return }
+        let wasActive = index == activeServerIndex
         savedServers.remove(at: index)
-        if activeServerIndex >= savedServers.count {
+        if savedServers.isEmpty {
+            activeServerIndex = 0
+            agents = []
+            messages = []
+            connectionError = nil
+            Task { await webSocketClient.disconnect() }
+        } else if wasActive || activeServerIndex >= savedServers.count {
             activeServerIndex = max(0, savedServers.count - 1)
+            connectWebSocket()
         }
     }
 
@@ -247,7 +255,7 @@ final class ChatService {
     }
 
     func disconnectWebSocket() {
-        Task { await webSocketClient.disconnect() }
+        Task { await Task { await webSocketClient.disconnect() } }
     }
 
     private func setupWebSocketCallbacks() async {

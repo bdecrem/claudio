@@ -543,7 +543,11 @@ struct SettingsView: View {
                     onRemove: index == -1 ? nil : {
                         chatService.removeServer(at: index)
                         editingIndex = nil
-                    }
+                    },
+                    onScanQR: index == -1 ? {
+                        editingIndex = nil
+                        showQRScanner = true
+                    } : nil
                 )
             }
         }
@@ -640,6 +644,7 @@ private struct ServerEditSheet: View {
     let onSave: () -> Void
     let onCancel: () -> Void
     var onRemove: (() -> Void)?
+    var onScanQR: (() -> Void)?
 
     var body: some View {
         NavigationStack {
@@ -716,6 +721,19 @@ private struct ServerEditSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
+
+                if isNew, let onScanQR {
+                    Button {
+                        onScanQR()
+                    } label: {
+                        Text("Or login with QR")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 20)
+                }
+
 
                 if let onRemove {
                     Button(role: .destructive) {
