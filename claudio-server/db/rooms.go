@@ -75,18 +75,17 @@ func (db *DB) EnsureLobby() error {
 }
 
 // EnsureLobbyAgent adds a default agent to the lobby if not already present.
-// Also backfills openclaw_agent_id on existing rows.
+// Always updates the token/URL so env var changes take effect.
 func (db *DB) EnsureLobbyAgent(agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji string) error {
 	if err := db.AddAgentParticipant(LobbyRoomID, agentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji); err != nil {
 		return err
 	}
-	// Backfill openclaw_agent_id on existing rows that predate the column
-	if openclawAgentID != "" {
-		db.Exec(`UPDATE participants SET openclaw_agent_id = ? WHERE room_id = ? AND agent_id = ? AND openclaw_url = ? AND (openclaw_agent_id IS NULL OR openclaw_agent_id = '')`,
-			openclawAgentID, LobbyRoomID, agentID, openclawURL)
-	}
+	// Always sync token/URL from env vars
+	db.Exec(`UPDATE participants SET openclaw_token = ?, openclaw_url = ?, openclaw_agent_id = ? WHERE room_id = ? AND agent_id = ?`,
+		openclawToken, openclawURL, openclawAgentID, LobbyRoomID, agentID)
 	return nil
 }
+
 
 func (db *DB) CreateRoom(name, emoji, createdBy string, public bool) (*Room, error) {
 	id := nanoid()
