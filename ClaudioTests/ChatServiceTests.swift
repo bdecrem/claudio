@@ -63,8 +63,8 @@ final class ChatServiceTests: XCTestCase {
     func testApiRepresentation() {
         let msg = Message(role: .assistant, content: "test response")
         let api = msg.apiRepresentation
-        XCTAssertEqual(api["role"], "assistant")
-        XCTAssertEqual(api["content"], "test response")
+        XCTAssertEqual(api["role"] as? String, "assistant")
+        XCTAssertEqual(api["content"] as? String, "test response")
     }
 
     // MARK: - Agent Switching & History

@@ -37,6 +37,7 @@ final class ChatService {
         var url: String
         var token: String
         var nickname: String = ""
+        var useHTTP: Bool = false
     }
 
     /// All saved servers (persisted as JSON in UserDefaults)
@@ -105,12 +106,8 @@ final class ChatService {
         pendingAgents.contains(selectedAgent)
     }
 
-    var connectionMode: String {
-        UserDefaults.standard.string(forKey: "connectionMode") ?? "websocket"
-    }
-
     var isHTTPMode: Bool {
-        connectionMode == "http"
+        selectedServer?.useHTTP ?? false
     }
 
     var isConnected: Bool {
@@ -136,7 +133,7 @@ final class ChatService {
                    !url.hasPrefix("ws://") && !url.hasPrefix("wss://") {
                     url = "https://\(url)"
                 }
-                return Server(url: url, token: server.token, nickname: server.nickname ?? "")
+                return Server(url: url, token: server.token, nickname: server.nickname ?? "", useHTTP: server.useHTTP ?? false)
             }
         } else {
             self.savedServers = []
@@ -172,7 +169,7 @@ final class ChatService {
         connectWebSocket()
     }
 
-    func updateServer(at index: Int, url: String, token: String, nickname: String = "") {
+    func updateServer(at index: Int, url: String, token: String, nickname: String = "", useHTTP: Bool = false) {
         guard savedServers.indices.contains(index) else { return }
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
@@ -183,7 +180,8 @@ final class ChatService {
         savedServers[index] = Server(
             url: cleaned,
             token: token,
-            nickname: nickname
+            nickname: nickname,
+            useHTTP: useHTTP
         )
         if index == activeServerIndex {
             connectWebSocket()
@@ -631,10 +629,10 @@ final class ChatService {
             ]
         }
 
-        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count) mode=\(self.connectionMode)")
+        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count) http=\(self.isHTTPMode)")
 
         if isHTTPMode {
-            sendViaHTTP(compositeId: compositeId, playVoice: playVoice)
+            sendViaHTTP(compositeId: compositeId, playVoice: playVoice, imageAttachments: imageAttachments)
         } else {
             Task {
                 do {
@@ -653,7 +651,7 @@ final class ChatService {
     }
 
     /// Send current messages via HTTP transport with SSE streaming
-    private func sendViaHTTP(compositeId: String, playVoice: Bool) {
+    private func sendViaHTTP(compositeId: String, playVoice: Bool, imageAttachments: [ImageAttachment] = []) {
         guard let server = selectedServer else {
             connectionError = "[HTTP] No server configured"
             pendingAgents.remove(compositeId)
@@ -663,63 +661,93 @@ final class ChatService {
 
         let baseURL = httpURL(for: server.url)
         let agentId = selectedAgentId
-        let apiMessages = messages.map { $0.apiRepresentation }
 
-        log.info("sendViaHTTP: serverURL=\(server.url) baseURL=\(baseURL) agentId=\(agentId) messages=\(apiMessages.count)")
+        log.info("sendViaHTTP: serverURL=\(server.url) baseURL=\(baseURL) agentId=\(agentId) images=\(imageAttachments.count)")
 
-        httpTransport.sendMessage(
-            baseURL: baseURL,
-            token: server.token,
-            agentId: agentId,
-            messages: apiMessages,
-            onDelta: { [weak self] text in
-                guard let self else { return }
-                if let msgId = self.streamingMessageId,
-                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
-                    self.messages[idx].content = text
-                } else {
-                    let placeholder = Message(role: .assistant, content: text, isStreaming: true)
-                    self.messages.append(placeholder)
-                    self.streamingMessageId = placeholder.id
-                }
-            },
-            onFinished: { [weak self] text in
-                guard let self else { return }
-                if let msgId = self.streamingMessageId,
-                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
-                    self.messages[idx].content = text
-                    self.messages[idx].isStreaming = false
-                } else {
-                    self.messages.append(Message(role: .assistant, content: text))
-                }
-                self.pendingAgents.remove(compositeId)
-                self.isLoading = self.isLoadingCurrentAgent
-                self.streamingMessageId = nil
-                self.persistChatHistories()
-
-                // Handle voice TTS via separate endpoint
-                if playVoice, !text.isEmpty {
-                    let server = self.selectedServer
-                    Task { [weak self] in
-                        guard let self, let server else { return }
-                        await self.playTTSPublic(for: text, agentId: agentId, server: server)
+        Task { @MainActor in
+            // Upload images first, append URLs to last user message content
+            if !imageAttachments.isEmpty {
+                var uploadedPaths: [String] = []
+                for img in imageAttachments {
+                    do {
+                        let path = try await httpTransport.uploadImage(
+                            baseURL: baseURL, token: server.token,
+                            imageData: img.data, contentType: img.contentType
+                        )
+                        uploadedPaths.append(path)
+                    } catch {
+                        log.error("Image upload failed: \(error)")
+                        self.connectionError = "Image upload failed: \(error.localizedDescription)"
+                        self.pendingAgents.remove(compositeId)
+                        self.isLoading = self.isLoadingCurrentAgent
+                        return
                     }
                 }
-            },
-            onError: { [weak self] errorMsg in
-                guard let self else { return }
-                if let msgId = self.streamingMessageId,
-                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
-                    self.messages[idx].content = errorMsg
-                    self.messages[idx].isStreaming = false
+                // Embed file paths in the last user message
+                if let lastIdx = self.messages.lastIndex(where: { $0.role == .user }) {
+                    let refs = uploadedPaths.map { " [image:\($0)]" }.joined()
+                    self.messages[lastIdx].content += refs
                 }
-                self.connectionError = errorMsg
-                self.pendingAgents.remove(compositeId)
-                self.isLoading = self.isLoadingCurrentAgent
-                self.streamingMessageId = nil
-                self.persistChatHistories()
             }
-        )
+
+            let apiMessages = self.messages.map { $0.apiRepresentation }
+
+            self.httpTransport.sendMessage(
+                baseURL: baseURL,
+                token: server.token,
+                agentId: agentId,
+                messages: apiMessages,
+                onDelta: { [weak self] text in
+                    guard let self else { return }
+                    if let msgId = self.streamingMessageId,
+                       let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                        self.messages[idx].content = text
+                    } else {
+                        let placeholder = Message(role: .assistant, content: text, isStreaming: true)
+                        self.messages.append(placeholder)
+                        self.streamingMessageId = placeholder.id
+                    }
+                },
+                onFinished: { [weak self] text in
+                    guard let self else { return }
+                    let (cleanedText, imageURLs) = self.extractImageURLs(from: text)
+                    if let msgId = self.streamingMessageId,
+                       let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                        self.messages[idx].content = cleanedText
+                        self.messages[idx].imageURLs += imageURLs
+                        self.messages[idx].isStreaming = false
+                    } else {
+                        self.messages.append(Message(role: .assistant, content: cleanedText, imageURLs: imageURLs))
+                    }
+                    self.pendingAgents.remove(compositeId)
+                    self.isLoading = self.isLoadingCurrentAgent
+                    self.streamingMessageId = nil
+                    self.persistChatHistories()
+
+                    // Handle voice TTS via separate endpoint
+                    if playVoice, !text.isEmpty {
+                        let server = self.selectedServer
+                        Task { [weak self] in
+                            guard let self, let server else { return }
+                            await self.playTTSPublic(for: text, agentId: agentId, server: server)
+                        }
+                    }
+                },
+                onError: { [weak self] errorMsg in
+                    guard let self else { return }
+                    if let msgId = self.streamingMessageId,
+                       let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                        self.messages[idx].content = errorMsg
+                        self.messages[idx].isStreaming = false
+                    }
+                    self.connectionError = errorMsg
+                    self.pendingAgents.remove(compositeId)
+                    self.isLoading = self.isLoadingCurrentAgent
+                    self.streamingMessageId = nil
+                    self.persistChatHistories()
+                }
+            )
+        }
     }
 
     /// Send a message and collect the full response (for voice mode)
@@ -727,7 +755,7 @@ final class ChatService {
         serverURL: String,
         token: String,
         agentId: String,
-        messages: [[String: String]]
+        messages: [[String: Any]]
     ) async throws -> String {
         if isHTTPMode {
             return try await sendForVoiceViaHTTP(
@@ -739,7 +767,7 @@ final class ChatService {
         }
 
         // Extract the last user message
-        guard let lastMessage = messages.last, let content = lastMessage["content"] else {
+        guard let lastMessage = messages.last, let content = lastMessage["content"] as? String else {
             throw WebSocketError.serverError("No message to send")
         }
 
@@ -766,7 +794,7 @@ final class ChatService {
         serverURL: String,
         token: String,
         agentId: String,
-        messages: [[String: String]]
+        messages: [[String: Any]]
     ) async throws -> String {
         let baseURL = httpURL(for: serverURL)
 
@@ -934,6 +962,61 @@ final class ChatService {
 
     // MARK: - Helpers
 
+    /// Extract image URLs and MEDIA: references from text, return (cleaned text, image URLs)
+    private static let imageURLPattern = try! NSRegularExpression(
+        pattern: #"https?://\S+\.(?:png|jpg|jpeg|gif|webp)(?:\?\S*)?"#,
+        options: .caseInsensitive
+    )
+
+    private static let mediaPattern = try! NSRegularExpression(
+        pattern: #"MEDIA:\s*\S+"#,
+        options: []
+    )
+
+    private func extractImageURLs(from text: String) -> (String, [String]) {
+        var urls: [String] = []
+        var cleaned = text
+
+        // Extract MEDIA: /path/to/.openclaw/media/file.png references
+        let mediaRange = NSRange(cleaned.startIndex..., in: cleaned)
+        let mediaMatches = Self.mediaPattern.matches(in: cleaned, range: mediaRange)
+        for match in mediaMatches.reversed() {
+            if let r = Range(match.range, in: cleaned) {
+                let full = String(cleaned[r])
+                let path = full.replacingOccurrences(of: "MEDIA:", with: "").trimmingCharacters(in: .whitespaces)
+                // Extract relative part after .openclaw/media/
+                let relative: String
+                if let range = path.range(of: ".openclaw/media/") {
+                    relative = String(path[range.upperBound...])
+                } else {
+                    // Use filename only as fallback
+                    relative = (path as NSString).lastPathComponent
+                }
+                let baseURL = httpBaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+                urls.append("\(baseURL)/media/\(relative)")
+                cleaned.removeSubrange(r)
+            }
+        }
+
+        // Extract plain https:// image URLs
+        let urlRange = NSRange(cleaned.startIndex..., in: cleaned)
+        let urlMatches = Self.imageURLPattern.matches(in: cleaned, range: urlRange)
+        for match in urlMatches.reversed() {
+            if let r = Range(match.range, in: cleaned) {
+                urls.append(String(cleaned[r]))
+                cleaned.removeSubrange(r)
+            }
+        }
+
+        // Clean up leftover blank lines
+        while cleaned.contains("\n\n\n") {
+            cleaned = cleaned.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        urls.reverse() // restore original order
+        return (cleaned, urls)
+    }
+
     func clearMessages() {
         messages.removeAll()
         chatHistories[selectedAgent] = nil
@@ -990,7 +1073,7 @@ final class ChatService {
     }
 
     private func persistServers() {
-        let codable = savedServers.map { CodableServer(url: $0.url, token: $0.token, nickname: $0.nickname) }
+        let codable = savedServers.map { CodableServer(url: $0.url, token: $0.token, nickname: $0.nickname, useHTTP: $0.useHTTP) }
         if let data = try? JSONEncoder().encode(codable) {
             UserDefaults.standard.set(data, forKey: "savedServers")
         }
@@ -1003,6 +1086,7 @@ private struct CodableServer: Codable {
     let url: String
     let token: String
     var nickname: String?
+    var useHTTP: Bool?
 }
 
 private struct CodableChatState: Codable {

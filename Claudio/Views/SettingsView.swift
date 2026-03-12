@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var editURL = ""
     @State private var editToken = ""
     @State private var editNickname = ""
+    @State private var editUseHTTP = false
     @State private var joinCode = ""
     @State private var isJoining = false
     @State private var joinError: String?
@@ -22,7 +23,6 @@ struct SettingsView: View {
     @State private var showDangerousConfirm = false
     @State private var dangerousExpanded = false
     @State private var showQRScanner = false
-    @AppStorage("connectionMode") private var connectionMode = "websocket"
 
     private let cardRadius: CGFloat = 14
 
@@ -40,6 +40,7 @@ struct SettingsView: View {
                                     editURL = ""
                                     editToken = ""
                                     editNickname = ""
+                                    editUseHTTP = false
                                 } label: {
                                     VStack(spacing: 10) {
                                         Image(systemName: "plus")
@@ -93,6 +94,7 @@ struct SettingsView: View {
                                 editingIndex = -1
                                 editURL = ""
                                 editToken = ""
+                                editUseHTTP = false
                             } label: {
                                 Image(systemName: "plus")
                                     .font(.system(size: 13, weight: .medium))
@@ -147,6 +149,7 @@ struct SettingsView: View {
                                             editURL = server.url
                                             editToken = server.token
                                             editNickname = server.nickname
+                                            editUseHTTP = server.useHTTP
                                         } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
@@ -404,31 +407,6 @@ struct SettingsView: View {
                                 Divider()
                                     .background(Color.white.opacity(0.04))
 
-                                // Connection Mode
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("Connection Mode")
-                                                .font(.system(size: 13, design: .monospaced))
-                                                .foregroundStyle(Theme.textSecondary)
-                                            Text("HTTP requires enabling the endpoint on your OpenClaw server")
-                                                .font(.system(size: 10, design: .monospaced))
-                                                .foregroundStyle(Theme.textDim)
-                                        }
-                                        Spacer()
-                                    }
-                                    Picker("", selection: $connectionMode) {
-                                        Text("WebSocket").tag("websocket")
-                                        Text("HTTP").tag("http")
-                                    }
-                                    .pickerStyle(.segmented)
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-
-                                Divider()
-                                    .background(Color.white.opacity(0.04))
-
                                 VStack(alignment: .leading, spacing: Theme.spacing) {
                                     HStack(alignment: .top) {
                                         VStack(alignment: .leading, spacing: 4) {
@@ -557,11 +535,12 @@ struct SettingsView: View {
                     url: $editURL,
                     token: $editToken,
                     nickname: $editNickname,
+                    useHTTP: $editUseHTTP,
                     onSave: {
                         if index == -1 {
                             chatService.addServer(url: editURL, token: editToken)
                         } else {
-                            chatService.updateServer(at: index, url: editURL, token: editToken, nickname: editNickname)
+                            chatService.updateServer(at: index, url: editURL, token: editToken, nickname: editNickname, useHTTP: editUseHTTP)
                         }
                         editingIndex = nil
                     },
@@ -667,6 +646,7 @@ private struct ServerEditSheet: View {
     @Binding var url: String
     @Binding var token: String
     @Binding var nickname: String
+    @Binding var useHTTP: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
     var onRemove: (() -> Void)?
@@ -733,6 +713,24 @@ private struct ServerEditSheet: View {
                             .tint(Theme.accent)
                             .autocorrectionDisabled()
                             .textInputAutocapitalization(.never)
+                    }
+                    .padding(14)
+
+                    Divider().background(Theme.border)
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Use HTTP")
+                                .font(.system(size: 15))
+                                .foregroundStyle(settingsText)
+                            Text("Requires HTTP endpoint enabled on server")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: $useHTTP)
+                            .labelsHidden()
+                            .tint(Theme.accent)
                     }
                     .padding(14)
                 }

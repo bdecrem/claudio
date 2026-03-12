@@ -46,7 +46,7 @@ struct Message: Identifiable, Equatable {
         self.replyToId = replyToId
     }
 
-    var apiRepresentation: [String: String] {
+    var apiRepresentation: [String: Any] {
         ["role": role.rawValue, "content": content]
     }
 }

@@ -16,7 +16,7 @@ final class HTTPTransport: @unchecked Sendable {
         baseURL: String,
         token: String,
         agentId: String,
-        messages: [[String: String]],
+        messages: [[String: Any]],
         onDelta: @escaping @MainActor (String) -> Void,
         onFinished: @escaping @MainActor (String) -> Void,
         onError: @escaping @MainActor (String) -> Void
@@ -48,13 +48,57 @@ final class HTTPTransport: @unchecked Sendable {
         activeTask = nil
     }
 
+    /// Upload an image and return its public URL
+    func uploadImage(baseURL: String, token: String, imageData: Data, contentType: String) async throws -> String {
+        var urlString = baseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        if urlString.hasSuffix("/v1/chat/completions") {
+            urlString = String(urlString.dropLast("/v1/chat/completions".count))
+        }
+        urlString += "/media/upload"
+
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        if let host = url.host?.lowercased(), host.contains("ngrok") {
+            request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        }
+
+        let dataURL = "data:\(contentType);base64,\(imageData.base64EncodedString())"
+        let body = ["image": dataURL]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        log.info("Uploading image to \(urlString)")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Upload failed: HTTP \(status)"])
+        }
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let path = json["path"] as? String else {
+            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No path in upload response"])
+        }
+
+        log.info("Upload complete: \(path)")
+        return path
+    }
+
     // MARK: - Internal
 
     private func stream(
         baseURL: String,
         token: String,
         agentId: String,
-        messages: [[String: String]],
+        messages: [[String: Any]],
         onDelta: @escaping @MainActor (String) -> Void,
         onFinished: @escaping @MainActor (String) -> Void,
         onError: @escaping @MainActor (String) -> Void

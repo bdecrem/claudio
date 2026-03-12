@@ -5,7 +5,7 @@ import os
 private let log = Logger(subsystem: "com.claudio.app", category: "VoiceService")
 
 /// Closure that sends messages to the server and returns the assistant response
-typealias VoiceSendHandler = (_ messages: [[String: String]]) async throws -> String
+typealias VoiceSendHandler = (_ messages: [[String: Any]]) async throws -> String
 
 /// Closure that plays TTS for a given text
 typealias VoiceTTSHandler = (_ text: String) async -> Void
@@ -38,14 +38,14 @@ final class VoiceService {
     private var sendHandler: VoiceSendHandler?
     private var ttsHandler: VoiceTTSHandler?
     private var agentId = ""
-    private var chatHistory: [[String: String]] = []
+    private var chatHistory: [[String: Any]] = []
 
     // MARK: - Public API
 
     @MainActor
     func start(
         agentId: String,
-        chatHistory: [[String: String]],
+        chatHistory: [[String: Any]],
         speechRecognizer: SpeechRecognizer,
         sendHandler: @escaping VoiceSendHandler,
         ttsHandler: @escaping VoiceTTSHandler
@@ -150,7 +150,7 @@ final class VoiceService {
     }
 
     @MainActor
-    private func performSendAndSpeak(messages: [[String: String]]) async {
+    private func performSendAndSpeak(messages: [[String: Any]]) async {
         guard let sendHandler else {
             state = .error("Not connected.")
             return
