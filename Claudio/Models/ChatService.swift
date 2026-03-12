@@ -708,16 +708,17 @@ final class ChatService {
                         self.streamingMessageId = placeholder.id
                     }
                 },
-                onFinished: { [weak self] text in
+                onFinished: { [weak self] text, serverImageURLs in
                     guard let self else { return }
                     let (cleanedText, imageURLs) = self.extractImageURLs(from: text)
+                    let allImageURLs = imageURLs + serverImageURLs
                     if let msgId = self.streamingMessageId,
                        let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
                         self.messages[idx].content = cleanedText
-                        self.messages[idx].imageURLs += imageURLs
+                        self.messages[idx].imageURLs += allImageURLs
                         self.messages[idx].isStreaming = false
                     } else {
-                        self.messages.append(Message(role: .assistant, content: cleanedText, imageURLs: imageURLs))
+                        self.messages.append(Message(role: .assistant, content: cleanedText, imageURLs: allImageURLs))
                     }
                     self.pendingAgents.remove(compositeId)
                     self.isLoading = self.isLoadingCurrentAgent
@@ -805,7 +806,7 @@ final class ChatService {
                 agentId: agentId,
                 messages: messages,
                 onDelta: { _ in },
-                onFinished: { text in
+                onFinished: { text, _ in
                     continuation.resume(returning: text)
                 },
                 onError: { errorMsg in
