@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var showDangerousConfirm = false
     @State private var dangerousExpanded = false
     @State private var showQRScanner = false
+    @AppStorage("connectionMode") private var connectionMode = "websocket"
 
     private let cardRadius: CGFloat = 14
 
@@ -400,6 +401,31 @@ struct SettingsView: View {
 
                             // Expanded content
                             if dangerousExpanded {
+                                Divider()
+                                    .background(Color.white.opacity(0.04))
+
+                                // Connection Mode
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Connection Mode")
+                                                .font(.system(size: 13, design: .monospaced))
+                                                .foregroundStyle(Theme.textSecondary)
+                                            Text("HTTP requires enabling the endpoint on your OpenClaw server")
+                                                .font(.system(size: 10, design: .monospaced))
+                                                .foregroundStyle(Theme.textDim)
+                                        }
+                                        Spacer()
+                                    }
+                                    Picker("", selection: $connectionMode) {
+                                        Text("WebSocket").tag("websocket")
+                                        Text("HTTP").tag("http")
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+
                                 Divider()
                                     .background(Color.white.opacity(0.04))
 

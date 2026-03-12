@@ -24,6 +24,7 @@ final class ChatService {
     private var queuedVoiceReplyAudio: [Data] = []
     private var pendingAgents: Set<String> = []
     private let webSocketClient = WebSocketClient()
+    private let httpTransport = HTTPTransport()
 
     // Streaming message tracking
     private var streamingMessageId: UUID?
@@ -102,6 +103,14 @@ final class ChatService {
 
     var isLoadingCurrentAgent: Bool {
         pendingAgents.contains(selectedAgent)
+    }
+
+    var connectionMode: String {
+        UserDefaults.standard.string(forKey: "connectionMode") ?? "websocket"
+    }
+
+    var isHTTPMode: Bool {
+        connectionMode == "http"
     }
 
     var isConnected: Bool {
@@ -389,6 +398,16 @@ final class ChatService {
 
     @MainActor
     private func handleChatEvent(_ event: ChatEvent) {
+        // In HTTP mode, ignore WS chat events for the selected agent — HTTP transport handles them
+        if isHTTPMode {
+            let isForSelectedAgent = event.sessionKey.isEmpty
+                || compositeIdFromSessionKey(event.sessionKey) == selectedAgent
+            if isForSelectedAgent {
+                log.info("handleChatEvent: ignoring WS event in HTTP mode (state=\(event.state.rawValue))")
+                return
+            }
+        }
+
         log.info("handleChatEvent: state=\(event.state.rawValue) text=\(event.text?.prefix(50) ?? "nil") imageURLs=\(event.imageURLs.count) audio=\(event.audioAttachments.count)")
         for (i, url) in event.imageURLs.enumerated() {
             log.info("  imageURL[\(i)]: \(url.prefix(120))")
@@ -612,21 +631,95 @@ final class ChatService {
             ]
         }
 
-        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count)")
+        log.info("sendMessage: '\(content.prefix(50))' sessionKey=\(sessionKey) attachments=\(wireAttachments.count) mode=\(self.connectionMode)")
 
-        Task {
-            do {
-                _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content, attachments: wireAttachments)
-            } catch {
-                log.error("sendMessage failed: \(error)")
-                await MainActor.run {
-                    self.connectionError = error.localizedDescription
-                    self.pendingAgents.remove(compositeId)
-                    self.isLoading = self.isLoadingCurrentAgent
-                    self.pendingVoiceTTS = false
+        if isHTTPMode {
+            sendViaHTTP(compositeId: compositeId, playVoice: playVoice)
+        } else {
+            Task {
+                do {
+                    _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content, attachments: wireAttachments)
+                } catch {
+                    log.error("sendMessage failed: \(error)")
+                    await MainActor.run {
+                        self.connectionError = error.localizedDescription
+                        self.pendingAgents.remove(compositeId)
+                        self.isLoading = self.isLoadingCurrentAgent
+                        self.pendingVoiceTTS = false
+                    }
                 }
             }
         }
+    }
+
+    /// Send current messages via HTTP transport with SSE streaming
+    private func sendViaHTTP(compositeId: String, playVoice: Bool) {
+        guard let server = selectedServer else {
+            connectionError = "[HTTP] No server configured"
+            pendingAgents.remove(compositeId)
+            isLoading = isLoadingCurrentAgent
+            return
+        }
+
+        let baseURL = httpURL(for: server.url)
+        let agentId = selectedAgentId
+        let apiMessages = messages.map { $0.apiRepresentation }
+
+        log.info("sendViaHTTP: serverURL=\(server.url) baseURL=\(baseURL) agentId=\(agentId) messages=\(apiMessages.count)")
+
+        httpTransport.sendMessage(
+            baseURL: baseURL,
+            token: server.token,
+            agentId: agentId,
+            messages: apiMessages,
+            onDelta: { [weak self] text in
+                guard let self else { return }
+                if let msgId = self.streamingMessageId,
+                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                    self.messages[idx].content = text
+                } else {
+                    let placeholder = Message(role: .assistant, content: text, isStreaming: true)
+                    self.messages.append(placeholder)
+                    self.streamingMessageId = placeholder.id
+                }
+            },
+            onFinished: { [weak self] text in
+                guard let self else { return }
+                if let msgId = self.streamingMessageId,
+                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                    self.messages[idx].content = text
+                    self.messages[idx].isStreaming = false
+                } else {
+                    self.messages.append(Message(role: .assistant, content: text))
+                }
+                self.pendingAgents.remove(compositeId)
+                self.isLoading = self.isLoadingCurrentAgent
+                self.streamingMessageId = nil
+                self.persistChatHistories()
+
+                // Handle voice TTS via separate endpoint
+                if playVoice, !text.isEmpty {
+                    let server = self.selectedServer
+                    Task { [weak self] in
+                        guard let self, let server else { return }
+                        await self.playTTSPublic(for: text, agentId: agentId, server: server)
+                    }
+                }
+            },
+            onError: { [weak self] errorMsg in
+                guard let self else { return }
+                if let msgId = self.streamingMessageId,
+                   let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
+                    self.messages[idx].content = errorMsg
+                    self.messages[idx].isStreaming = false
+                }
+                self.connectionError = errorMsg
+                self.pendingAgents.remove(compositeId)
+                self.isLoading = self.isLoadingCurrentAgent
+                self.streamingMessageId = nil
+                self.persistChatHistories()
+            }
+        )
     }
 
     /// Send a message and collect the full response (for voice mode)
@@ -636,6 +729,15 @@ final class ChatService {
         agentId: String,
         messages: [[String: String]]
     ) async throws -> String {
+        if isHTTPMode {
+            return try await sendForVoiceViaHTTP(
+                serverURL: serverURL,
+                token: token,
+                agentId: agentId,
+                messages: messages
+            )
+        }
+
         // Extract the last user message
         guard let lastMessage = messages.last, let content = lastMessage["content"] else {
             throw WebSocketError.serverError("No message to send")
@@ -656,6 +758,32 @@ final class ChatService {
                     }
                 }
             }
+        }
+    }
+
+    /// Voice mode via HTTP transport — returns final text
+    private func sendForVoiceViaHTTP(
+        serverURL: String,
+        token: String,
+        agentId: String,
+        messages: [[String: String]]
+    ) async throws -> String {
+        let baseURL = httpURL(for: serverURL)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            httpTransport.sendMessage(
+                baseURL: baseURL,
+                token: token,
+                agentId: agentId,
+                messages: messages,
+                onDelta: { _ in },
+                onFinished: { text in
+                    continuation.resume(returning: text)
+                },
+                onError: { errorMsg in
+                    continuation.resume(throwing: WebSocketError.serverError(errorMsg))
+                }
+            )
         }
     }
 

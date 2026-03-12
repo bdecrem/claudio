@@ -49,6 +49,8 @@
 		G1000001000000000000000B /* MentionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = G2000001000000000000000B /* MentionOverlay.swift */; };
 		M10000010000000000000001 /* MediaImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000010000000000000001 /* MediaImageCache.swift */; };
 		K10000010000000000000001 /* CachedMediaImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = K20000010000000000000001 /* CachedMediaImage.swift */; };
+		HT1000010000000000000001 /* HTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = HT2000010000000000000001 /* HTTPTransport.swift */; };
+		HT1000010000000000000002 /* HTTPTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HT2000010000000000000002 /* HTTPTransportTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -98,6 +100,8 @@
 		G2000001000000000000000B /* MentionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionOverlay.swift; sourceTree = "<group>"; };
 		M20000010000000000000001 /* MediaImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaImageCache.swift; sourceTree = "<group>"; };
 		K20000010000000000000001 /* CachedMediaImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedMediaImage.swift; sourceTree = "<group>"; };
+		HT2000010000000000000001 /* HTTPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTransport.swift; sourceTree = "<group>"; };
+		HT2000010000000000000002 /* HTTPTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTransportTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -205,6 +209,7 @@
 				G20000010000000000000002 /* RoomService.swift */,
 				J20000010000000000000001 /* JoinCodeDecoder.swift */,
 				M20000010000000000000001 /* MediaImageCache.swift */,
+				HT2000010000000000000001 /* HTTPTransport.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -232,6 +237,7 @@
 				T20000010000000000000001 /* RPCTypesTests.swift */,
 				T20000010000000000000002 /* ChatServiceTests.swift */,
 				T20000010000000000000003 /* NotificationServiceTests.swift */,
+				HT2000010000000000000002 /* HTTPTransportTests.swift */,
 			);
 			path = ClaudioTests;
 			sourceTree = "<group>";
@@ -377,6 +383,7 @@
 				J10000010000000000000001 /* JoinCodeDecoder.swift in Sources */,
 				M10000010000000000000001 /* MediaImageCache.swift in Sources */,
 				K10000010000000000000001 /* CachedMediaImage.swift in Sources */,
+				HT1000010000000000000001 /* HTTPTransport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +394,7 @@
 				T10000010000000000000001 /* RPCTypesTests.swift in Sources */,
 				T10000010000000000000002 /* ChatServiceTests.swift in Sources */,
 				T10000010000000000000003 /* NotificationServiceTests.swift in Sources */,
+				HT1000010000000000000002 /* HTTPTransportTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
