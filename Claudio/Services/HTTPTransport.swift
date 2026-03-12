@@ -210,7 +210,8 @@ final class HTTPTransport: @unchecked Sendable {
         // The SSE stream only contains the assistant's text — tool outputs
         // (like generated images) are captured by the claudio-media plugin
         // and served via GET /media/attachments.
-        let sessionKey = "agent:\(agentId):openai-user:agent:\(agentId):main"
+        // The session key matches the x-openclaw-session-key header sent above.
+        let sessionKey = "agent:\(agentId):main"
         let imageURLs = await fetchMediaAttachments(baseURL: baseURL, token: token, sessionKey: sessionKey)
 
         await MainActor.run { onFinished(finalText, imageURLs) }
