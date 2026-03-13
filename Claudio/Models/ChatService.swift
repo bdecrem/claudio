@@ -665,16 +665,16 @@ final class ChatService {
         log.info("sendViaHTTP: serverURL=\(server.url) baseURL=\(baseURL) agentId=\(agentId) images=\(imageAttachments.count)")
 
         Task { @MainActor in
-            // Upload images first, append URLs to last user message content
+            // Upload images and collect their URLs
+            var uploadedURLs: [String] = []
             if !imageAttachments.isEmpty {
-                var uploadedPaths: [String] = []
                 for img in imageAttachments {
                     do {
                         let path = try await httpTransport.uploadImage(
                             baseURL: baseURL, token: server.token,
                             imageData: img.data, contentType: img.contentType
                         )
-                        uploadedPaths.append(path)
+                        uploadedURLs.append(path)
                     } catch {
                         log.error("Image upload failed: \(error)")
                         self.connectionError = "Image upload failed: \(error.localizedDescription)"
@@ -683,14 +683,22 @@ final class ChatService {
                         return
                     }
                 }
-                // Embed file paths in the last user message
-                if let lastIdx = self.messages.lastIndex(where: { $0.role == .user }) {
-                    let refs = uploadedPaths.map { " [image:\($0)]" }.joined()
-                    self.messages[lastIdx].content += refs
-                }
             }
 
-            let apiMessages = self.messages.map { $0.apiRepresentation }
+            // Build OpenAI-format messages, with image_url content blocks for the last user message
+            var apiMessages = self.messages.map { $0.apiRepresentation }
+            if !uploadedURLs.isEmpty, let lastIdx = apiMessages.lastIndex(where: { ($0["role"] as? String) == "user" }) {
+                let textContent = apiMessages[lastIdx]["content"] as? String ?? ""
+                var contentBlocks: [[String: Any]] = [["type": "text", "text": textContent]]
+                for urlStr in uploadedURLs {
+                    contentBlocks.append([
+                        "type": "image_url",
+                        "image_url": ["url": urlStr]
+                    ])
+                }
+                apiMessages[lastIdx]["content"] = contentBlocks
+                log.info("sendViaHTTP: added \(uploadedURLs.count) image_url block(s) to message")
+            }
 
             self.httpTransport.sendMessage(
                 baseURL: baseURL,

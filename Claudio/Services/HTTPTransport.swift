@@ -83,13 +83,18 @@ final class HTTPTransport: @unchecked Sendable {
             throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Upload failed: HTTP \(status)"])
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let path = json["path"] as? String else {
-            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No path in upload response"])
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No JSON in upload response"])
         }
 
-        log.info("Upload complete: \(path)")
-        return path
+        // Prefer the full URL (HTTP-accessible), fall back to local path
+        let result = (json["url"] as? String) ?? (json["path"] as? String) ?? ""
+        guard !result.isEmpty else {
+            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No url or path in upload response"])
+        }
+
+        log.info("Upload complete: \(result)")
+        return result
     }
 
     // MARK: - Internal
