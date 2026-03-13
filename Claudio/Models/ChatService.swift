@@ -710,8 +710,10 @@ final class ChatService {
                 },
                 onFinished: { [weak self] text, serverImageURLs in
                     guard let self else { return }
+                    log.info("HTTP onFinished: text=\(text.prefix(200)) serverImageURLs=\(serverImageURLs)")
                     let (cleanedText, imageURLs) = self.extractImageURLs(from: text)
                     let allImageURLs = imageURLs + serverImageURLs
+                    log.info("HTTP onFinished: extractedURLs=\(imageURLs) allImageURLs=\(allImageURLs)")
                     if let msgId = self.streamingMessageId,
                        let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
                         self.messages[idx].content = cleanedText
