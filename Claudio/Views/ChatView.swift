@@ -592,6 +592,7 @@ struct ChatView: View {
     }
 
     private var connectionStatusColor: Color {
+        if chatService.isHTTPMode { return Theme.green }
         switch chatService.wsConnectionState {
         case .connected: return Theme.green
         case .connecting: return Theme.accent
@@ -601,6 +602,7 @@ struct ChatView: View {
     }
 
     private var connectionStatusText: String {
+        if chatService.isHTTPMode { return "online" }
         switch chatService.wsConnectionState {
         case .connected: return "online"
         case .connecting: return "connecting"
