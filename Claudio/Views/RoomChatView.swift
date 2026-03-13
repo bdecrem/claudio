@@ -265,7 +265,7 @@ struct RoomChatView: View {
             Button { sendMessage() } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.background)
+                    .foregroundStyle(Theme.onAccent)
                     .frame(width: 44, height: 44)
                     .background(Theme.accent, in: Circle())
             }

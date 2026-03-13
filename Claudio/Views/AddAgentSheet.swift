@@ -101,7 +101,7 @@ struct AddAgentSheet: View {
             }
             .foregroundStyle(Theme.textPrimary)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 
     private func serverName(for agent: ChatService.Agent) -> String {

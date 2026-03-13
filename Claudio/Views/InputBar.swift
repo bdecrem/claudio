@@ -67,7 +67,7 @@ struct InputBar: View {
                             if pendingImageCount > 0 {
                                 Text("\(pendingImageCount)")
                                     .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(Theme.background)
+                                    .foregroundStyle(Theme.onAccent)
                                     .frame(width: 14, height: 14)
                                     .background(Theme.accent, in: Circle())
                                     .offset(x: 10, y: -10)
@@ -132,7 +132,7 @@ struct InputBar: View {
                 } label: {
                     Image(systemName: "arrow.up")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Theme.background)
+                        .foregroundStyle(Theme.onAccent)
                         .frame(width: 44, height: 44)
                         .background(Theme.accent, in: Circle())
                         .hoverEffect(.highlight)

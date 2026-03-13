@@ -54,7 +54,7 @@ struct ChatView: View {
                         } label: {
                             Text("Add Server")
                                 .font(.system(.body, design: .rounded, weight: .medium))
-                                .foregroundStyle(Theme.background)
+                                .foregroundStyle(Theme.onAccent)
                                 .padding(.horizontal, Theme.spacing * 3)
                                 .padding(.vertical, Theme.spacing * 1.5)
                                 .background(Theme.accent, in: Capsule())
@@ -303,7 +303,7 @@ struct ChatView: View {
                                         } label: {
                                             Image(systemName: "xmark")
                                                 .font(.system(size: 8, weight: .bold))
-                                                .foregroundStyle(Theme.background)
+                                                .foregroundStyle(Theme.onAccent)
                                                 .frame(width: 16, height: 16)
                                                 .background(Theme.textSecondary, in: Circle())
                                         }
@@ -349,7 +349,7 @@ struct ChatView: View {
                             } label: {
                                 Text("Retry")
                                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                                    .foregroundStyle(Theme.background)
+                                    .foregroundStyle(Theme.onAccent)
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 10)
                                     .background(Theme.accent, in: Capsule())
@@ -425,7 +425,7 @@ struct ChatView: View {
                 displayNameOverride: "The Lounge"
             )
             .background(Theme.background)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(Theme.colorScheme)
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhotos, maxSelectionCount: 4, matching: .images)
         .onChange(of: selectedPhotos) { _, items in
@@ -438,7 +438,7 @@ struct ChatView: View {
                 onDismiss: { endVoiceSession() }
             )
             .background(Theme.background)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(Theme.colorScheme)
         }
         .alert("Enable Notifications?", isPresented: $showNotificationPrompt) {
             Button("Enable") {
@@ -484,7 +484,7 @@ struct ChatView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 
     // MARK: - Lobby

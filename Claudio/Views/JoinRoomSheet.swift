@@ -59,7 +59,7 @@ struct JoinRoomSheet: View {
             }
             .foregroundStyle(Theme.textPrimary)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 
     // MARK: - Browse Tab

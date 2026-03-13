@@ -98,6 +98,6 @@ struct CreateRoomSheet: View {
             }
             .foregroundStyle(Theme.textPrimary)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 }

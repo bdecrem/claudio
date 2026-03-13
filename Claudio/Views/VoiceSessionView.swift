@@ -92,7 +92,7 @@ struct VoiceSessionView: View {
                 .padding(.bottom, 48)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 
     private func voiceMessageBubble(role: String, content: String) -> some View {

@@ -28,7 +28,7 @@ struct RoomListView: View {
         }
         .fullScreenCover(item: $selectedRoom) { room in
             RoomChatView(roomService: roomService, chatService: chatService, room: room)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(Theme.colorScheme)
         }
     }
 
@@ -59,7 +59,7 @@ struct RoomListView: View {
                 } label: {
                     Text("Create")
                         .font(.system(.body, design: .rounded, weight: .medium))
-                        .foregroundStyle(Theme.background)
+                        .foregroundStyle(Theme.onAccent)
                         .padding(.horizontal, Theme.spacing * 3)
                         .padding(.vertical, Theme.spacing * 1.5)
                         .background(Theme.accent, in: Capsule())
@@ -173,7 +173,7 @@ private struct RoomRow: View {
                     if room.unreadCount > 0 {
                         Text("\(room.unreadCount)")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Theme.background)
+                            .foregroundStyle(Theme.onAccent)
                             .frame(minWidth: 18, minHeight: 18)
                             .background(Theme.accent, in: Capsule())
                     }

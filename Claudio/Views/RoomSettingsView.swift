@@ -207,7 +207,7 @@ struct RoomSettingsView: View {
         .task {
             roomInfo = await roomService.fetchRoomInfo(displayRoom.id)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 }
 

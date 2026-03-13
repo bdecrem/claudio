@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Muted text for settings rows — avoids bright white dominating the hierarchy
-private let settingsText = Color(hex: "999999")
+/// Muted text for settings rows
+private var settingsText: Color { Theme.textSecondary }
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -23,6 +23,8 @@ struct SettingsView: View {
     @State private var showDangerousConfirm = false
     @State private var dangerousExpanded = false
     @State private var showQRScanner = false
+    @State private var backgroundHex = ThemeManager.shared.backgroundHex
+    @State private var backgroundPickerColor = Color(hex: ThemeManager.shared.backgroundHex)
 
     private let cardRadius: CGFloat = 14
 
@@ -222,6 +224,65 @@ struct SettingsView: View {
                             .background(Theme.surface)
                             .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
                         }
+                    }
+
+                    // MARK: - Appearance
+                    SettingsSection(title: "Appearance") {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text("Background")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(settingsText)
+                                Spacer()
+                                Text("#")
+                                    .font(.system(size: 14, design: .monospaced))
+                                    .foregroundStyle(Theme.textDim)
+                                TextField("0A0A0A", text: $backgroundHex)
+                                    .font(.system(size: 14, design: .monospaced))
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .frame(width: 72)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.characters)
+                                    .multilineTextAlignment(.trailing)
+                                    .onChange(of: backgroundHex) { _, newValue in
+                                        let cleaned = newValue.trimmingCharacters(in: .alphanumerics.inverted)
+                                        if cleaned.count == 6, cleaned.range(of: "^[0-9A-Fa-f]{6}$", options: .regularExpression) != nil {
+                                            ThemeManager.shared.backgroundHex = cleaned.uppercased()
+                                            backgroundPickerColor = Color(hex: cleaned)
+                                        }
+                                    }
+                                ColorPicker("", selection: $backgroundPickerColor, supportsOpacity: false)
+                                    .labelsHidden()
+                                    .frame(width: 30)
+                                    .onChange(of: backgroundPickerColor) { _, newColor in
+                                        let hex = newColor.toHex()
+                                        backgroundHex = hex
+                                        ThemeManager.shared.backgroundHex = hex
+                                    }
+                            }
+                            .padding(14)
+
+                            Divider().background(Theme.border)
+
+                            HStack {
+                                Text("Text")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(settingsText)
+                                Spacer()
+                                Picker("", selection: Binding(
+                                    get: { ThemeManager.shared.lightText },
+                                    set: { ThemeManager.shared.lightText = $0 }
+                                )) {
+                                    Text("Light").tag(true)
+                                    Text("Dark").tag(false)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 140)
+                            }
+                            .padding(14)
+                        }
+                        .background(Theme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))
                     }
 
                     // MARK: - Notifications
@@ -582,7 +643,7 @@ struct SettingsView: View {
         } message: {
             Text("May introduce unexpected behavior. Claudio will not ask. Claudio will act.")
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 
     private func displayName(for url: String) -> String {
@@ -792,7 +853,7 @@ private struct ServerEditSheet: View {
             }
             .foregroundStyle(Theme.textPrimary)
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(Theme.colorScheme)
     }
 }
 

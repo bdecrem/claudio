@@ -1,18 +1,72 @@
 import SwiftUI
 
+// MARK: - Theme Manager (persists user's appearance preferences)
+
+@Observable
+final class ThemeManager {
+    static let shared = ThemeManager()
+
+    var backgroundHex: String {
+        didSet { UserDefaults.standard.set(backgroundHex, forKey: "theme_backgroundHex") }
+    }
+
+    /// When true, UI uses light text (for dark backgrounds). When false, dark text (for light backgrounds).
+    var lightText: Bool {
+        didSet { UserDefaults.standard.set(lightText, forKey: "theme_lightText") }
+    }
+
+    private init() {
+        self.backgroundHex = UserDefaults.standard.string(forKey: "theme_backgroundHex") ?? "0A0A0A"
+        // Default to true (light text on dark background)
+        if UserDefaults.standard.object(forKey: "theme_lightText") != nil {
+            self.lightText = UserDefaults.standard.bool(forKey: "theme_lightText")
+        } else {
+            self.lightText = true
+        }
+    }
+}
+
+// MARK: - Theme
+
 enum Theme {
+    private static var mgr: ThemeManager { ThemeManager.shared }
+
     // MARK: - Colors
-    static let background = Color(hex: "0A0A0A")
-    static let surface = Color(hex: "1A1A1A")
-    static let surface2 = Color(hex: "222222")
-    static let border = Color(hex: "2A2A2A")
+
+    static var background: Color { Color(hex: mgr.backgroundHex) }
+
+    static var surface: Color {
+        mgr.lightText ? Color.white.opacity(0.08) : Color.black.opacity(0.05)
+    }
+    static var surface2: Color {
+        mgr.lightText ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+    }
+    static var border: Color {
+        mgr.lightText ? Color.white.opacity(0.14) : Color.black.opacity(0.10)
+    }
+
     static let accent = Color(hex: "D4A44C")
-    static let accentDim = Color(hex: "D4A44C").opacity(0.12)
-    static let textPrimary = Color(hex: "E8E8E8")
-    static let textSecondary = Color(hex: "666666")
-    static let textDim = Color(hex: "3A3A3A")
+    static var accentDim: Color { accent.opacity(0.12) }
+
+    static var textPrimary: Color {
+        mgr.lightText ? Color(hex: "E8E8E8") : Color(hex: "1A1A1A")
+    }
+    static var textSecondary: Color {
+        mgr.lightText ? Color(hex: "999999") : Color(hex: "555555")
+    }
+    static var textDim: Color {
+        mgr.lightText ? Color(hex: "3A3A3A") : Color(hex: "BBBBBB")
+    }
+
+    /// For text/icons placed on accent-colored backgrounds (e.g. send button arrow)
+    static let onAccent = Color(hex: "0A0A0A")
+
     static let green = Color(hex: "3DBD6C")
     static let danger = Color(hex: "C0392B")
+
+    static var colorScheme: ColorScheme {
+        mgr.lightText ? .dark : .light
+    }
 
     // Participant colors for group chat differentiation
     static let participantColors: [Color] = [
@@ -58,5 +112,12 @@ extension Color {
             green: Double(g) / 255,
             blue: Double(b) / 255
         )
+    }
+
+    func toHex() -> String {
+        let ui = UIColor(self)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
     }
 }
