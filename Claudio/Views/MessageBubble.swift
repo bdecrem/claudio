@@ -72,9 +72,10 @@ struct MessageBubble: View {
 
                 HStack(spacing: 0) {
                     if !message.content.isEmpty {
-                        Text(message.content)
+                        Text(markdownContent)
                             .font(.system(size: 15, weight: .light, design: .serif))
                             .foregroundStyle(Theme.textPrimary)
+                            .tint(Color(red: 0.4, green: 0.7, blue: 1.0))
                             .textSelection(.enabled)
                             .lineSpacing(3)
                     }
@@ -103,6 +104,14 @@ struct MessageBubble: View {
                 .padding(.top, 1)
         }
         .padding(.horizontal, 14)
+    }
+
+    private var markdownContent: AttributedString {
+        // Try parsing as markdown to get clickable links and basic formatting
+        if let attributed = try? AttributedString(markdown: message.content, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            return attributed
+        }
+        return AttributedString(message.content)
     }
 
     private var timeString: String {
