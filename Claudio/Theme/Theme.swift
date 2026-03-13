@@ -15,6 +15,14 @@ final class ThemeManager {
         didSet { UserDefaults.standard.set(lightText, forKey: "theme_lightText") }
     }
 
+    /// When true, hides the macOS title bar so the background color bleeds through.
+    var transparentTitleBar: Bool {
+        didSet {
+            UserDefaults.standard.set(transparentTitleBar, forKey: "theme_transparentTitleBar")
+            applyTitleBarStyle()
+        }
+    }
+
     private init() {
         self.backgroundHex = UserDefaults.standard.string(forKey: "theme_backgroundHex") ?? "0A0A0A"
         // Default to true (light text on dark background)
@@ -23,6 +31,25 @@ final class ThemeManager {
         } else {
             self.lightText = true
         }
+        self.transparentTitleBar = UserDefaults.standard.bool(forKey: "theme_transparentTitleBar")
+    }
+
+    func applyTitleBarStyle() {
+        #if targetEnvironment(macCatalyst)
+        DispatchQueue.main.async {
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let titlebar = windowScene.titlebar else { return }
+            if self.transparentTitleBar {
+                titlebar.titleVisibility = .hidden
+                titlebar.separatorStyle = .none
+                titlebar.toolbar?.isVisible = false
+            } else {
+                titlebar.titleVisibility = .visible
+                titlebar.separatorStyle = .automatic
+                titlebar.toolbar?.isVisible = true
+            }
+        }
+        #endif
     }
 }
 

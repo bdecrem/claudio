@@ -280,6 +280,24 @@ struct SettingsView: View {
                                 .frame(width: 140)
                             }
                             .padding(14)
+
+                            #if targetEnvironment(macCatalyst)
+                            Divider().background(Theme.border)
+
+                            HStack {
+                                Text("Transparent Title Bar")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(settingsText)
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { ThemeManager.shared.transparentTitleBar },
+                                    set: { ThemeManager.shared.transparentTitleBar = $0 }
+                                ))
+                                .labelsHidden()
+                                .tint(Theme.accent)
+                            }
+                            .padding(14)
+                            #endif
                         }
                         .background(Theme.surface)
                         .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))

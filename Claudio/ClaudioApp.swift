@@ -23,6 +23,7 @@ struct ClaudioApp: App {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     showLaunch = false
                 }
+                ThemeManager.shared.applyTitleBarStyle()
             }
             .onChange(of: NotificationService.shared.pendingAgentId) { _, newValue in
                 guard let agentId = newValue else { return }
