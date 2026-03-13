@@ -599,7 +599,7 @@ struct SettingsView: View {
                     useHTTP: $editUseHTTP,
                     onSave: {
                         if index == -1 {
-                            chatService.addServer(url: editURL, token: editToken)
+                            chatService.addServer(url: editURL, token: editToken, useHTTP: editUseHTTP)
                         } else {
                             chatService.updateServer(at: index, url: editURL, token: editToken, nickname: editNickname, useHTTP: editUseHTTP)
                         }
