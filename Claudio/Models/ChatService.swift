@@ -251,6 +251,12 @@ final class ChatService {
             return
         }
 
+        if server.useHTTP {
+            log.info("connectWebSocket: HTTP mode — fetching agents via HTTP")
+            Task { await fetchAgentsViaHTTP(server: server) }
+            return
+        }
+
         log.info("connectWebSocket: \(server.url)")
         Task {
             if !callbacksReady {
@@ -258,6 +264,70 @@ final class ChatService {
                 callbacksReady = true
             }
             await webSocketClient.connect(serverURL: server.url, token: server.token)
+        }
+    }
+
+    @MainActor
+    private func fetchAgentsViaHTTP(server: Server) async {
+        let baseURL = httpURL(for: server.url).trimmingCharacters(in: .init(charactersIn: "/"))
+        guard let url = URL(string: "\(baseURL)/media/agents") else {
+            log.error("fetchAgentsViaHTTP: bad URL")
+            connectionError = "Invalid server URL"
+            return
+        }
+
+        var request = URLRequest(url: url)
+        if !server.token.isEmpty {
+            request.setValue("Bearer \(server.token)", forHTTPHeaderField: "Authorization")
+        }
+        if let host = url.host?.lowercased(), host.contains("ngrok") {
+            request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                log.error("fetchAgentsViaHTTP: HTTP \(status)")
+                connectionError = "Failed to fetch agents (HTTP \(status))"
+                agentFetchFailed = true
+                return
+            }
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let agentList = json["agents"] as? [[String: Any]] else {
+                log.error("fetchAgentsViaHTTP: bad JSON")
+                agentFetchFailed = true
+                return
+            }
+
+            var allAgents: [Agent] = []
+            for a in agentList {
+                guard let id = a["id"] as? String else { continue }
+                allAgents.append(Agent(
+                    id: "\(activeServerIndex):\(id)",
+                    agentId: id,
+                    name: (a["name"] as? String) ?? id,
+                    emoji: a["emoji"] as? String,
+                    color: a["color"] as? String,
+                    serverIndex: activeServerIndex
+                ))
+            }
+
+            agents = allAgents
+            agentFetchFailed = false
+            connectionError = nil
+            log.info("fetchAgentsViaHTTP: got \(allAgents.count) agents")
+
+            if selectedAgent.isEmpty || !agents.contains(where: { $0.id == selectedAgent }) {
+                selectedAgent = visibleAgents.first?.id ?? agents.first?.id ?? ""
+                log.info("fetchAgentsViaHTTP: selected '\(self.selectedAgent)'")
+            }
+        } catch {
+            log.error("fetchAgentsViaHTTP: \(error)")
+            connectionError = "Can't connect to server"
+            agentFetchFailed = true
         }
     }
 
