@@ -4,7 +4,7 @@ import os
 
 private let log = Logger(subsystem: "com.claudio.app", category: "ChatService")
 
-@Observable
+@Observable @MainActor
 final class ChatService {
     var messages: [Message] = []
     var isLoading = false
@@ -30,6 +30,9 @@ final class ChatService {
     private var streamingMessageId: UUID?
     private var pendingVoiceTTS: Bool = false
     private var voiceContinuation: CheckedContinuation<String, Error>?
+
+    // Persistence throttle — avoid encoding megabytes of history on every streaming delta
+    private var persistDebounceTask: Task<Void, Never>?
 
     // MARK: - Server config
 
@@ -93,6 +96,18 @@ final class ChatService {
             guard oldValue != selectedAgent else { return }
             UserDefaults.standard.set(selectedAgent, forKey: "selectedAgent")
             unreadAgentIds.remove(selectedAgent)
+
+            // Cancel any in-flight stream for the old agent before swapping messages
+            if streamingMessageId != nil {
+                // Finalize the streaming message so it doesn't corrupt the new agent's chat
+                if let idx = messages.firstIndex(where: { $0.id == streamingMessageId }) {
+                    messages[idx].isStreaming = false
+                }
+                streamingMessageId = nil
+            }
+            // Cancel HTTP stream if active
+            httpTransport.abort()
+
             if !oldValue.isEmpty {
                 chatHistories[oldValue] = messages
             }
@@ -267,7 +282,6 @@ final class ChatService {
         }
     }
 
-    @MainActor
     private func fetchAgentsViaHTTP(server: Server) async {
         let baseURL = httpURL(for: server.url).trimmingCharacters(in: .init(charactersIn: "/"))
         guard let url = URL(string: "\(baseURL)/media/agents") else {
@@ -332,7 +346,7 @@ final class ChatService {
     }
 
     func disconnectWebSocket() {
-        Task { await Task { await webSocketClient.disconnect() } }
+        Task { await webSocketClient.disconnect() }
     }
 
     private func setupWebSocketCallbacks() async {
@@ -372,7 +386,6 @@ final class ChatService {
         )
     }
 
-    @MainActor
     private func onWebSocketConnected() async {
         // Fetch agents via WebSocket
         await fetchAgentsViaWS()
@@ -393,7 +406,6 @@ final class ChatService {
         )
     }
 
-    @MainActor
     private func fetchAgentsViaWS() async {
         do {
             let wsAgents = try await webSocketClient.agentsList()
@@ -428,7 +440,6 @@ final class ChatService {
         }
     }
 
-    @MainActor
     private func loadChatHistory() async {
         do {
             let historyMessages = try await webSocketClient.chatHistory(sessionKey: currentSessionKey, limit: 50)
@@ -464,7 +475,6 @@ final class ChatService {
         return agents.first(where: { $0.agentId == rawAgentId })?.id
     }
 
-    @MainActor
     private func handleChatEvent(_ event: ChatEvent) {
         // In HTTP mode, ignore WS chat events for the selected agent — HTTP transport handles them
         if isHTTPMode {
@@ -552,16 +562,13 @@ final class ChatService {
                 pendingVoiceTTS = false
                 let attachments = event.audioAttachments
                 let server = selectedServer
-                Task { [weak self] in
-                    guard let self else { return }
+                Task {
                     let audioData = await self.extractPlayableMP3Data(from: attachments, server: server)
-                    await MainActor.run {
-                        if let audioData {
-                            self.queuedVoiceReplyAudio.append(audioData)
-                            continuation.resume(returning: finalText)
-                        } else {
-                            continuation.resume(throwing: WebSocketError.serverError("Voice response missing playable MP3 attachment."))
-                        }
+                    if let audioData {
+                        self.queuedVoiceReplyAudio.append(audioData)
+                        continuation.resume(returning: finalText)
+                    } else {
+                        continuation.resume(throwing: WebSocketError.serverError("Voice response missing playable MP3 attachment."))
                     }
                 }
             }
@@ -571,14 +578,11 @@ final class ChatService {
                 pendingVoiceTTS = false
                 let attachments = event.audioAttachments
                 let server = selectedServer
-                Task { [weak self] in
-                    guard let self else { return }
+                Task {
                     if let audioData = await self.extractPlayableMP3Data(from: attachments, server: server) {
                         _ = await self.playAudioData(audioData, source: "inline-voice-mp3")
                     } else {
-                        await MainActor.run {
-                            self.connectionError = "Voice response missing playable MP3 attachment."
-                        }
+                        self.connectionError = "Voice response missing playable MP3 attachment."
                     }
                 }
             }
@@ -630,7 +634,6 @@ final class ChatService {
 
     // MARK: - Agent Events (Tool Calls)
 
-    @MainActor
     private func handleAgentEvent(_ event: AgentEvent) {
         log.info("handleAgentEvent: stream=\(event.stream) phase=\(event.phase) tool=\(event.toolName ?? "nil") meta=\(event.meta?.prefix(80) ?? "nil") output=\(event.output?.prefix(120) ?? "nil") imageRelURL=\(event.imageRelativeURL ?? "nil")")
 
@@ -709,12 +712,10 @@ final class ChatService {
                     _ = try await webSocketClient.chatSend(sessionKey: sessionKey, message: content, attachments: wireAttachments)
                 } catch {
                     log.error("sendMessage failed: \(error)")
-                    await MainActor.run {
-                        self.connectionError = error.localizedDescription
-                        self.pendingAgents.remove(compositeId)
-                        self.isLoading = self.isLoadingCurrentAgent
-                        self.pendingVoiceTTS = false
-                    }
+                    self.connectionError = error.localizedDescription
+                    self.pendingAgents.remove(compositeId)
+                    self.isLoading = self.isLoadingCurrentAgent
+                    self.pendingVoiceTTS = false
                 }
             }
         }
@@ -739,7 +740,7 @@ final class ChatService {
             HTTPImageAttachment(data: img.data, mediaType: img.contentType)
         }
 
-        Task { @MainActor in
+        Task {
             let apiMessages = self.messages.map { $0.apiRepresentation }
 
             self.httpTransport.sendMessage(
@@ -826,17 +827,15 @@ final class ChatService {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            Task { @MainActor in
-                self.voiceContinuation = continuation
-                // Send via WebSocket — response comes back via chat event
-                Task {
-                    do {
-                        _ = try await self.webSocketClient.chatSend(sessionKey: self.currentSessionKey, message: content)
-                    } catch {
-                        if let cont = self.voiceContinuation {
-                            self.voiceContinuation = nil
-                            cont.resume(throwing: error)
-                        }
+            self.voiceContinuation = continuation
+            // Send via WebSocket — response comes back via chat event
+            Task {
+                do {
+                    _ = try await self.webSocketClient.chatSend(sessionKey: self.currentSessionKey, message: content)
+                } catch {
+                    if let cont = self.voiceContinuation {
+                        self.voiceContinuation = nil
+                        cont.resume(throwing: error)
                     }
                 }
             }
@@ -871,7 +870,6 @@ final class ChatService {
 
     // MARK: - TTS
 
-    @MainActor
     func playTTSPublic(for text: String, agentId: String, server: Server) async {
         guard !queuedVoiceReplyAudio.isEmpty else {
             connectionError = "Voice response missing playable MP3 attachment."
@@ -897,7 +895,6 @@ final class ChatService {
         return serverURL
     }
 
-    @MainActor
     private func playAudioAttachments(_ attachments: [ChatEvent.AudioAttachment], server: Server?) async -> Bool {
         guard !attachments.isEmpty else { return false }
 
@@ -926,7 +923,6 @@ final class ChatService {
         return false
     }
 
-    @MainActor
     private func extractPlayableMP3Data(from attachments: [ChatEvent.AudioAttachment], server: Server?) async -> Data? {
         guard !attachments.isEmpty else { return nil }
 
@@ -955,7 +951,6 @@ final class ChatService {
         return nil
     }
 
-    @MainActor
     private func fetchAudioAttachmentData(urlString: String, server: Server?) async -> Data? {
         guard let url = URL(string: urlString) else { return nil }
         var request = URLRequest(url: url)
@@ -983,7 +978,6 @@ final class ChatService {
         }
     }
 
-    @MainActor
     private func playAudioData(_ data: Data, source: String) async -> Bool {
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback)
@@ -1092,7 +1086,23 @@ final class ChatService {
     // MARK: - Chat persistence
 
     func persistChatHistories() {
-        // Snapshot current agent's messages into histories
+        // During streaming, debounce to avoid encoding megabytes on every delta
+        if streamingMessageId != nil {
+            persistDebounceTask?.cancel()
+            persistDebounceTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                self?.doPersistChatHistories()
+            }
+            return
+        }
+        doPersistChatHistories()
+    }
+
+    private func doPersistChatHistories() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = nil
+
         var histories = chatHistories
         if !selectedAgent.isEmpty {
             histories[selectedAgent] = messages

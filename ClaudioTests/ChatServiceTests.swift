@@ -1,6 +1,7 @@
 import XCTest
 @testable import Claudio
 
+@MainActor
 final class ChatServiceTests: XCTestCase {
 
     private var service: ChatService!
