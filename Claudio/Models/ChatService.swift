@@ -154,7 +154,7 @@ final class ChatService {
 
     // MARK: - Server management
 
-    func addServer(url: String, token: String, useHTTP: Bool = false) {
+    func addServer(url: String, token: String) {
         var cleaned = url.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .init(charactersIn: "/"))
         guard !cleaned.isEmpty else { return }
@@ -162,7 +162,7 @@ final class ChatService {
            !cleaned.hasPrefix("ws://") && !cleaned.hasPrefix("wss://") {
             cleaned = "https://\(cleaned)"
         }
-        savedServers.append(Server(url: cleaned, token: token, nickname: "", useHTTP: useHTTP))
+        savedServers.append(Server(url: cleaned, token: token, nickname: ""))
         if savedServers.count == 1 {
             activeServerIndex = 0
         }
