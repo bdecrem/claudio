@@ -664,47 +664,20 @@ final class ChatService {
 
         log.info("sendViaHTTP: serverURL=\(server.url) baseURL=\(baseURL) agentId=\(agentId) images=\(imageAttachments.count)")
 
-        Task { @MainActor in
-            // Upload images and collect their URLs
-            var uploadedURLs: [String] = []
-            if !imageAttachments.isEmpty {
-                for img in imageAttachments {
-                    do {
-                        let path = try await httpTransport.uploadImage(
-                            baseURL: baseURL, token: server.token,
-                            imageData: img.data, contentType: img.contentType
-                        )
-                        uploadedURLs.append(path)
-                    } catch {
-                        log.error("Image upload failed: \(error)")
-                        self.connectionError = "Image upload failed: \(error.localizedDescription)"
-                        self.pendingAgents.remove(compositeId)
-                        self.isLoading = self.isLoadingCurrentAgent
-                        return
-                    }
-                }
-            }
+        // Convert image attachments to HTTPImageAttachment for inline base64 sending
+        let httpImages = imageAttachments.map { img in
+            HTTPImageAttachment(data: img.data, mediaType: img.contentType)
+        }
 
-            // Build OpenAI-format messages, with image_url content blocks for the last user message
-            var apiMessages = self.messages.map { $0.apiRepresentation }
-            if !uploadedURLs.isEmpty, let lastIdx = apiMessages.lastIndex(where: { ($0["role"] as? String) == "user" }) {
-                let textContent = apiMessages[lastIdx]["content"] as? String ?? ""
-                var contentBlocks: [[String: Any]] = [["type": "text", "text": textContent]]
-                for urlStr in uploadedURLs {
-                    contentBlocks.append([
-                        "type": "image_url",
-                        "image_url": ["url": urlStr]
-                    ])
-                }
-                apiMessages[lastIdx]["content"] = contentBlocks
-                log.info("sendViaHTTP: added \(uploadedURLs.count) image_url block(s) to message")
-            }
+        Task { @MainActor in
+            let apiMessages = self.messages.map { $0.apiRepresentation }
 
             self.httpTransport.sendMessage(
                 baseURL: baseURL,
                 token: server.token,
                 agentId: agentId,
                 messages: apiMessages,
+                images: httpImages,
                 onDelta: { [weak self] text in
                     guard let self else { return }
                     if let msgId = self.streamingMessageId,

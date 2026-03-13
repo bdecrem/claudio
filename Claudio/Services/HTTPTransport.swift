@@ -3,12 +3,19 @@ import os
 
 private let log = Logger(subsystem: "com.claudio.app", category: "HTTPTransport")
 
-/// Sends chat messages via POST /v1/chat/completions with SSE streaming.
-/// Alternative to WebSocket transport for servers with the HTTP endpoint enabled.
+/// Image attachment to send inline via the Responses API.
+struct HTTPImageAttachment {
+    let data: Data
+    let mediaType: String // e.g. "image/jpeg"
+}
+
+/// Sends chat messages via POST /v1/responses with SSE streaming.
+/// Uses the OpenAI Responses API format which supports inline image input.
 final class HTTPTransport: @unchecked Sendable {
     private var activeTask: Task<Void, Never>?
 
     /// Send a message and stream back deltas.
+    /// - `images` contains raw image data to send inline as base64 `input_image` blocks.
     /// - `onDelta` receives the full accumulated text so far (not per-token).
     /// - `onFinished` receives the final complete text and any image URLs from tool-generated media.
     /// - `onError` receives an error description.
@@ -17,6 +24,7 @@ final class HTTPTransport: @unchecked Sendable {
         token: String,
         agentId: String,
         messages: [[String: Any]],
+        images: [HTTPImageAttachment] = [],
         onDelta: @escaping @MainActor (String) -> Void,
         onFinished: @escaping @MainActor (String, [String]) -> Void,
         onError: @escaping @MainActor (String) -> Void
@@ -30,6 +38,7 @@ final class HTTPTransport: @unchecked Sendable {
                     token: token,
                     agentId: agentId,
                     messages: messages,
+                    images: images,
                     onDelta: onDelta,
                     onFinished: onFinished,
                     onError: onError
@@ -48,70 +57,68 @@ final class HTTPTransport: @unchecked Sendable {
         activeTask = nil
     }
 
-    /// Upload an image and return its public URL
-    func uploadImage(baseURL: String, token: String, imageData: Data, contentType: String) async throws -> String {
-        var urlString = baseURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        if urlString.hasSuffix("/v1/chat/completions") {
-            urlString = String(urlString.dropLast("/v1/chat/completions".count))
-        }
-        urlString += "/media/upload"
-
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !token.isEmpty {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        if let host = url.host?.lowercased(), host.contains("ngrok") {
-            request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
-        }
-
-        let dataURL = "data:\(contentType);base64,\(imageData.base64EncodedString())"
-        let body = ["image": dataURL]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        log.info("Uploading image to \(urlString)")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "Upload failed: HTTP \(status)"])
-        }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No JSON in upload response"])
-        }
-
-        // Prefer the full URL (HTTP-accessible), fall back to local path
-        let result = (json["url"] as? String) ?? (json["path"] as? String) ?? ""
-        guard !result.isEmpty else {
-            throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "No url or path in upload response"])
-        }
-
-        log.info("Upload complete: \(result)")
-        return result
-    }
-
     // MARK: - Internal
+
+    /// Convert chat-completions-style messages to Responses API `input` items.
+    /// Each message becomes `{"type": "message", "role": ..., "content": ...}`.
+    /// If the last user message has images, they are appended as `input_image` content parts.
+    private func buildInput(messages: [[String: Any]], images: [HTTPImageAttachment]) -> [[String: Any]] {
+        var input: [[String: Any]] = []
+
+        for (i, msg) in messages.enumerated() {
+            guard let role = msg["role"] as? String else { continue }
+            let content = msg["content"] as? String ?? ""
+            if content.isEmpty && role != "assistant" { continue }
+
+            let isLastUser = (role == "user") && (i == messages.count - 1 || !messages[(i+1)...].contains(where: { ($0["role"] as? String) == "user" }))
+
+            if isLastUser && !images.isEmpty {
+                // Build content array with text + images
+                var parts: [[String: Any]] = [
+                    ["type": "input_text", "text": content]
+                ]
+                for img in images {
+                    parts.append([
+                        "type": "input_image",
+                        "source": [
+                            "type": "base64",
+                            "media_type": img.mediaType,
+                            "data": img.data.base64EncodedString()
+                        ] as [String: Any]
+                    ])
+                }
+                input.append([
+                    "type": "message",
+                    "role": role,
+                    "content": parts
+                ])
+            } else {
+                input.append([
+                    "type": "message",
+                    "role": role,
+                    "content": content
+                ])
+            }
+        }
+
+        return input
+    }
 
     private func stream(
         baseURL: String,
         token: String,
         agentId: String,
         messages: [[String: Any]],
+        images: [HTTPImageAttachment],
         onDelta: @escaping @MainActor (String) -> Void,
         onFinished: @escaping @MainActor (String, [String]) -> Void,
         onError: @escaping @MainActor (String) -> Void
     ) async throws {
-        var urlString = baseURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        if !urlString.hasSuffix("/v1/chat/completions") {
-            urlString += "/v1/chat/completions"
-        }
+        let base = baseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+            .replacingOccurrences(of: "/v1/chat/completions", with: "")
+            .replacingOccurrences(of: "/v1/responses", with: "")
+        let urlString = base + "/v1/responses"
+
         guard let url = URL(string: urlString) else {
             await MainActor.run { onError("Invalid server URL") }
             return
@@ -128,17 +135,18 @@ final class HTTPTransport: @unchecked Sendable {
             request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
         }
 
+        let input = buildInput(messages: messages, images: images)
         let body: [String: Any] = [
             "model": "default",
             "stream": true,
             "user": "agent:\(agentId):main",
-            "messages": messages
+            "input": input
         ]
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         request.httpBody = bodyData
 
-        let bodyPreview = String(data: bodyData, encoding: .utf8)?.prefix(500) ?? "<nil>"
-        log.info("POST \(urlString) token=\(token.prefix(8))... body=\(bodyPreview)")
+        let bodySize = bodyData.count
+        log.info("POST \(urlString) token=\(token.prefix(8))... bodySize=\(bodySize) images=\(images.count)")
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
 
@@ -148,10 +156,9 @@ final class HTTPTransport: @unchecked Sendable {
             return
         }
 
-        log.info("HTTP: status=\(httpResponse.statusCode) contentType=\(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "nil")")
+        log.info("HTTP: status=\(httpResponse.statusCode)")
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            // Read error body for diagnostics
             var errorBody = ""
             for try await line in bytes.lines {
                 errorBody += line + "\n"
@@ -163,6 +170,7 @@ final class HTTPTransport: @unchecked Sendable {
             return
         }
 
+        // Parse Responses API SSE events
         var accumulated = ""
         var lineCount = 0
 
@@ -170,65 +178,69 @@ final class HTTPTransport: @unchecked Sendable {
             try Task.checkCancellation()
             lineCount += 1
 
-            // Log first 10 SSE lines for debugging
             if lineCount <= 10 {
-                log.info("HTTP SSE[\(lineCount)]: \(line.prefix(200))")
+                log.info("SSE[\(lineCount)]: \(line.prefix(200))")
             }
 
             guard line.hasPrefix("data: ") else { continue }
             let payload = String(line.dropFirst(6))
 
-            if payload == "[DONE]" {
-                log.info("HTTP: got [DONE] after \(lineCount) lines")
-                break
-            }
-
             guard let data = payload.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let choices = json["choices"] as? [[String: Any]],
-                  let choice = choices.first else {
-                if lineCount <= 10 {
-                    log.warning("HTTP: failed to parse SSE payload: \(payload.prefix(200))")
-                }
+                  let eventType = json["type"] as? String else {
                 continue
             }
 
-            // Check for finish_reason
-            if let finishReason = choice["finish_reason"] as? String, !finishReason.isEmpty {
-                log.info("HTTP: finish_reason=\(finishReason) after \(lineCount) lines")
-                break
-            }
+            switch eventType {
+            case "response.output_text.delta":
+                if let delta = json["delta"] as? String, !delta.isEmpty {
+                    accumulated += delta
+                    let text = accumulated
+                    await MainActor.run { onDelta(text) }
+                }
 
-            // Extract delta content
-            if let delta = choice["delta"] as? [String: Any],
-               let content = delta["content"] as? String, !content.isEmpty {
-                accumulated += content
-                let text = accumulated
-                await MainActor.run { onDelta(text) }
+            case "response.completed":
+                // Extract final text from the completed response
+                if let resp = json["response"] as? [String: Any],
+                   let output = resp["output"] as? [[String: Any]] {
+                    for item in output {
+                        if let content = item["content"] as? [[String: Any]] {
+                            for part in content {
+                                if (part["type"] as? String) == "output_text",
+                                   let text = part["text"] as? String {
+                                    accumulated = text
+                                }
+                            }
+                        }
+                    }
+                }
+                log.info("HTTP: response.completed after \(lineCount) lines")
+
+            case "response.failed":
+                log.error("HTTP: response.failed")
+                break
+
+            default:
+                break
             }
         }
 
         let finalText = accumulated
-        log.info("HTTP stream complete: \(finalText.count) chars, \(lineCount) lines total")
-        log.info("HTTP finalText preview: \(finalText.prefix(500))")
+        log.info("HTTP stream complete: \(finalText.count) chars, \(lineCount) lines")
 
-        // Fetch media attachments generated by server-side tool calls.
-        // The SSE stream only contains the assistant's text — tool outputs
-        // (like generated images) are captured by the claudio-media plugin
-        // and served via GET /media/attachments.
-        // The session key matches the x-openclaw-session-key header sent above.
+        // Fetch media attachments generated by server-side tool calls
         let sessionKey = "agent:\(agentId):main"
-        log.info("HTTP: fetching media attachments for session=\(sessionKey) agentId=\(agentId)")
-        let imageURLs = await fetchMediaAttachments(baseURL: baseURL, token: token, sessionKey: sessionKey)
-        log.info("HTTP: got \(imageURLs.count) media attachment(s): \(imageURLs)")
+        let imageURLs = await fetchMediaAttachments(baseURL: base, token: token, sessionKey: sessionKey)
+        log.info("HTTP: got \(imageURLs.count) media attachment(s)")
 
         await MainActor.run { onFinished(finalText, imageURLs) }
     }
 
-    /// Fetch image URLs captured by the claudio-media plugin's after_tool_call hook.
+    /// Fetch image URLs captured by the claudio-media plugin's hooks.
     private func fetchMediaAttachments(baseURL: String, token: String, sessionKey: String) async -> [String] {
         let base = baseURL.trimmingCharacters(in: .init(charactersIn: "/"))
             .replacingOccurrences(of: "/v1/chat/completions", with: "")
+            .replacingOccurrences(of: "/v1/responses", with: "")
         guard var components = URLComponents(string: "\(base)/media/attachments") else { return [] }
         components.queryItems = [URLQueryItem(name: "session", value: sessionKey)]
         guard let url = components.url else { return [] }
@@ -242,21 +254,14 @@ final class HTTPTransport: @unchecked Sendable {
         }
 
         do {
-            log.info("fetchMediaAttachments: GET \(url.absoluteString)")
             let (data, response) = try await URLSession.shared.data(for: request)
-            let httpResponse = response as? HTTPURLResponse
-            let status = httpResponse?.statusCode ?? 0
-            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(500) ?? "<nil>"
-            log.info("fetchMediaAttachments: status=\(status) body=\(bodyPreview)")
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard (200...299).contains(status) else { return [] }
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let attachments = json["attachments"] as? [[String: Any]] else {
-                log.warning("fetchMediaAttachments: failed to parse JSON")
                 return []
             }
-            let urls = attachments.compactMap { $0["url"] as? String }
-            log.info("fetchMediaAttachments: extracted \(urls.count) URL(s): \(urls)")
-            return urls
+            return attachments.compactMap { $0["url"] as? String }
         } catch {
             log.warning("Failed to fetch media attachments: \(error)")
             return []
