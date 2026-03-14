@@ -42,12 +42,10 @@ final class ThemeManager {
             if self.transparentTitleBar {
                 titlebar.titleVisibility = .hidden
                 titlebar.separatorStyle = .none
-                titlebar.toolbar?.isVisible = false
-            } else {
-                titlebar.titleVisibility = .visible
-                titlebar.separatorStyle = .automatic
-                titlebar.toolbar?.isVisible = true
+                // Let content extend into the title bar area
+                windowScene.titlebar?.toolbar = nil
             }
+            // When off, just leave defaults — don't force a toolbar visible
         }
         #endif
     }
