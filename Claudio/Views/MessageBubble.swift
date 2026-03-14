@@ -72,12 +72,20 @@ struct MessageBubble: View {
 
                 HStack(spacing: 0) {
                     if !message.content.isEmpty {
-                        Text(markdownContent)
-                            .font(.system(size: 15, weight: .light, design: .serif))
-                            .foregroundStyle(Theme.textPrimary)
-                            .tint(Color(red: 0.4, green: 0.7, blue: 1.0))
-                            .textSelection(.enabled)
-                            .lineSpacing(3)
+                        if message.isStreaming {
+                            // Plain text while streaming — markdown parsing is too expensive per-delta
+                            Text(message.content)
+                                .font(.system(size: 15, weight: .light, design: .serif))
+                                .foregroundStyle(Theme.textPrimary)
+                                .lineSpacing(3)
+                        } else {
+                            Text(markdownContent)
+                                .font(.system(size: 15, weight: .light, design: .serif))
+                                .foregroundStyle(Theme.textPrimary)
+                                .tint(Color(red: 0.4, green: 0.7, blue: 1.0))
+                                .textSelection(.enabled)
+                                .lineSpacing(3)
+                        }
                     }
 
                     if message.isStreaming {
@@ -114,10 +122,14 @@ struct MessageBubble: View {
         return AttributedString(message.content)
     }
 
-    private var timeString: String {
+    private static let timeFmt: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "HH:mm"
-        return fmt.string(from: message.timestamp)
+        return fmt
+    }()
+
+    private var timeString: String {
+        Self.timeFmt.string(from: message.timestamp)
     }
 
     private var bubbleBackground: some View {

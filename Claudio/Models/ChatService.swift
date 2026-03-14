@@ -31,6 +31,10 @@ final class ChatService {
     private var pendingVoiceTTS: Bool = false
     private var voiceContinuation: CheckedContinuation<String, Error>?
 
+    // Streaming render throttle — buffer content and flush at ~15fps to avoid layout storms
+    private var pendingStreamContent: String?
+    private var streamThrottleTask: Task<Void, Never>?
+
     // Persistence throttle — avoid encoding megabytes of history on every streaming delta
     private var persistDebounceTask: Task<Void, Never>?
 
@@ -99,6 +103,7 @@ final class ChatService {
 
             // Cancel any in-flight stream for the old agent before swapping messages
             if streamingMessageId != nil {
+                flushPendingStreamContent()
                 // Finalize the streaming message so it doesn't corrupt the new agent's chat
                 if let idx = messages.firstIndex(where: { $0.id == streamingMessageId }) {
                     messages[idx].isStreaming = false
@@ -521,11 +526,20 @@ final class ChatService {
 
             if let msgId = streamingMessageId,
                let idx = messages.firstIndex(where: { $0.id == msgId }) {
-                // Update existing streaming message — delta contains FULL text so far
-                messages[idx].content = text
+                // Buffer content and update images immediately (rare)
                 if !event.imageURLs.isEmpty {
                     let existing = Set(messages[idx].imageURLs)
                     messages[idx].imageURLs += event.imageURLs.filter { !existing.contains($0) }
+                }
+                // Throttle content updates to ~15fps to avoid SwiftUI layout storms
+                pendingStreamContent = text
+                if streamThrottleTask == nil {
+                    streamThrottleTask = Task { [weak self] in
+                        try? await Task.sleep(for: .milliseconds(66))
+                        guard let self, !Task.isCancelled else { return }
+                        self.flushPendingStreamContent()
+                        self.streamThrottleTask = nil
+                    }
                 }
             } else {
                 // First delta — create streaming placeholder
@@ -535,6 +549,9 @@ final class ChatService {
             }
 
         case .final_:
+            // Flush any buffered streaming content before finalizing
+            flushPendingStreamContent()
+
             let finalText = event.text ?? ""
 
             if let msgId = streamingMessageId,
@@ -752,8 +769,17 @@ final class ChatService {
                 onDelta: { [weak self] text in
                     guard let self else { return }
                     if let msgId = self.streamingMessageId,
-                       let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
-                        self.messages[idx].content = text
+                       self.messages.contains(where: { $0.id == msgId }) {
+                        // Throttle content updates to ~15fps
+                        self.pendingStreamContent = text
+                        if self.streamThrottleTask == nil {
+                            self.streamThrottleTask = Task { [weak self] in
+                                try? await Task.sleep(for: .milliseconds(66))
+                                guard let self, !Task.isCancelled else { return }
+                                self.flushPendingStreamContent()
+                                self.streamThrottleTask = nil
+                            }
+                        }
                     } else {
                         let placeholder = Message(role: .assistant, content: text, isStreaming: true)
                         self.messages.append(placeholder)
@@ -762,6 +788,7 @@ final class ChatService {
                 },
                 onFinished: { [weak self] text, serverImageURLs in
                     guard let self else { return }
+                    self.flushPendingStreamContent()
                     log.info("HTTP onFinished: text=\(text.prefix(200)) serverImageURLs=\(serverImageURLs)")
                     let (cleanedText, imageURLs) = self.extractImageURLs(from: text)
                     let allImageURLs = imageURLs + serverImageURLs
@@ -790,6 +817,7 @@ final class ChatService {
                 },
                 onError: { [weak self] errorMsg in
                     guard let self else { return }
+                    self.flushPendingStreamContent()
                     if let msgId = self.streamingMessageId,
                        let idx = self.messages.firstIndex(where: { $0.id == msgId }) {
                         self.messages[idx].content = errorMsg
@@ -1081,6 +1109,19 @@ final class ChatService {
         let message = Message(role: role, content: content)
         messages.append(message)
         persistChatHistories()
+    }
+
+    // MARK: - Streaming throttle
+
+    private func flushPendingStreamContent() {
+        streamThrottleTask?.cancel()
+        streamThrottleTask = nil
+        guard let content = pendingStreamContent else { return }
+        pendingStreamContent = nil
+        if let msgId = streamingMessageId,
+           let idx = messages.firstIndex(where: { $0.id == msgId }) {
+            messages[idx].content = content
+        }
     }
 
     // MARK: - Chat persistence
