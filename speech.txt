@@ -1,0 +1,612 @@
+# Apple Speech Framework — `SpeechAnalyzer` API Structure
+
+> **Platform availability:** iOS 26+, iPadOS 26+, macOS 26+, tvOS 26+, visionOS 26+, Mac Catalyst 26+
+> All new APIs are Swift-only (async/await, AsyncSequence). The legacy `SFSpeechRecognizer` Objective-C API still exists but is separate.
+
+---
+
+## Architecture Overview
+
+The framework is organized into three interacting layers:
+
+1. **Asset layer** — `AssetInventory` / `AssetInstallationRequest` — manages ML model downloads before any analysis can begin.
+2. **Module layer** — `SpeechTranscriber`, `DictationTranscriber`, `SpeechDetector` — pluggable analyzers that each conform to `SpeechModule`.
+3. **Session layer** — `SpeechAnalyzer` (a Swift `actor`) — accepts audio input, orchestrates modules, controls the lifecycle.
+
+Input flows in through `AnalyzerInput` structs (which wrap `AVAudioPCMBuffer`). Results flow out through each module's `AsyncSequence`-based `.results` property. Everything is async and decoupled.
+
+---
+
+## 1. `SpeechAnalyzer` — The Session Actor
+
+```swift
+final actor SpeechAnalyzer
+```
+
+The central coordinator. Declared as an `actor` for Swift concurrency safety.
+
+### Initializers
+
+There are three convenience initializers, offering increasing levels of automation:
+
+**Basic (no input yet):**
+```swift
+convenience init(
+    modules: [any SpeechModule],
+    options: SpeechAnalyzer.Options?
+)
+```
+Creates the analyzer but does not start analysis. You feed audio later via `analyzeSequence(_:)` or `start(inputSequence:)`.
+
+**With input sequence (begins immediately):**
+```swift
+convenience init<InputSequence>(
+    inputSequence: InputSequence,
+    modules: [any SpeechModule],
+    options: SpeechAnalyzer.Options?,
+    analysisContext: AnalysisContext,
+    volatileRangeChangedHandler: sending ((CMTimeRange, Bool, Bool) -> Void)?
+)
+```
+Creates and immediately begins autonomous analysis. `InputSequence` must conform to `AsyncSequence` of `AnalyzerInput`.
+
+**With audio file (begins immediately, async throws):**
+```swift
+convenience init(
+    inputAudioFile: AVAudioFile,
+    modules: [any SpeechModule],
+    options: SpeechAnalyzer.Options?,
+    analysisContext: AnalysisContext,
+    finishAfterFile: Bool,
+    volatileRangeChangedHandler: sending ((CMTimeRange, Bool, Bool) -> Void)?
+) async throws
+```
+Automatically converts the file to a compatible format and begins analysis.
+
+### Module Management
+
+```swift
+var modules: [any SpeechModule]
+func setModules([any SpeechModule]) async throws
+```
+Modules can be set at init or hot-swapped at runtime via `setModules(_:)`. Only one input sequence can be analyzed at a time across all modules.
+
+### Audio Format Helpers (static)
+
+```swift
+static func bestAvailableAudioFormat(
+    compatibleWith: [any SpeechModule]
+) async -> AVAudioFormat?
+
+static func bestAvailableAudioFormat(
+    compatibleWith: [any SpeechModule],
+    considering: AVAudioFormat?
+) async -> AVAudioFormat?
+```
+Queries installed assets to find the highest-quality `AVAudioFormat` all specified modules can jointly accept. The `considering:` variant takes the source audio's natural format into account. You must convert input buffers to this format before feeding them in — the analyzer does **no** audio conversion itself.
+
+### Performing Analysis (Structured Concurrency Style)
+
+```swift
+func analyzeSequence<InputSequence>(_ sequence: InputSequence) async throws -> CMTime?
+func analyzeSequence(from: AVAudioFile) async throws -> CMTime?
+```
+Runs the full analysis and returns only after the input is fully consumed, returning the last sample `CMTime` (or `nil` if no audio was received). These work naturally with `async let` and task groups.
+
+### Performing Analysis (Autonomous / Fire-and-Forget Style)
+
+```swift
+func start<InputSequence>(inputSequence: InputSequence) async throws
+func start(inputAudioFile: AVAudioFile, finishAfterFile: Bool) async throws
+```
+Kicks off analysis in an internal task and returns immediately. Useful for long-running background capture. You can call `start(...)` again with new input to switch sources.
+
+### Controlling Result Timing
+
+```swift
+func finalize(through: CMTime?) async throws
+func cancelAnalysis(before: CMTime)
+```
+`finalize(through:)` forces the modules to emit results up to a given timestamp — useful for synchronizing transcription delivery with outside events (e.g., save checkpoints). `cancelAnalysis(before:)` discards in-progress analysis for audio that predates the given time, useful when the user has scrolled past a section.
+
+### Finishing the Session
+
+The analyzer must be explicitly finished or deallocated. All finish methods cause module result streams to terminate.
+
+| Method | Behavior |
+|---|---|
+| `finalizeAndFinish(through: CMTime)` | Waits for results up to the given time, then finishes |
+| `finalizeAndFinishThroughEndOfInput()` | Waits for the full input to be consumed and finalized, then finishes |
+| `finish(after: CMTime)` | Finishes once input for the given time is consumed (does not wait for finalization) |
+| `cancelAndFinishNow()` | Immediately terminates, dropping pending results |
+
+Important: finishing the `AsyncStream.Continuation` (i.e., calling `inputBuilder.finish()`) does **not** finish the analysis session. You must call one of the above methods explicitly.
+
+### Responsiveness Tuning
+
+```swift
+func prepareToAnalyze(in: AVAudioFormat?) async throws
+func prepareToAnalyze(in: AVAudioFormat?, withProgressReadyHandler: sending ((Progress) -> Void)?) async throws
+```
+Pre-warms the analyzer and loads ML models eagerly before the first audio arrives, reducing first-result latency. The second variant provides a `Progress` object you can observe.
+
+### Volatile Range Monitoring
+
+```swift
+var volatileRange: CMTimeRange?
+func setVolatileRangeChangedHandler(sending ((CMTimeRange, Bool, Bool) -> Void)?)
+```
+The "volatile range" is the audio time window where results are still subject to revision (not yet final). The handler closure receives `(range: CMTimeRange, rangeDidBeginExpanding: Bool, rangeDidFinishShrinking: Bool)`. This is the mechanism for driving live, updating transcription UIs.
+
+### Context
+
+```swift
+var context: AnalysisContext
+func setContext(_ context: AnalysisContext) async throws
+```
+Injects an `AnalysisContext` (custom vocabulary, contextual strings) into the running session.
+
+---
+
+## 2. `SpeechAnalyzer.Options`
+
+```swift
+struct SpeechAnalyzer.Options : Equatable, Sendable
+```
+
+Passed to any `SpeechAnalyzer` initializer.
+
+```swift
+init(priority: TaskPriority, modelRetention: SpeechAnalyzer.Options.ModelRetention)
+
+let priority: TaskPriority                          // Priority of internal analysis tasks
+let modelRetention: SpeechAnalyzer.Options.ModelRetention
+```
+
+### `ModelRetention` enum
+
+Controls whether ML models are kept in memory after the analyzer is deallocated, allowing future analyzer instances to start faster:
+
+| Case | Behavior |
+|---|---|
+| (default — unspecified) | Models unloaded on dealloc |
+| (retention strategy) | Models held in a system cache for reuse |
+
+The `SpeechModels.endRetention()` static method releases all cached models globally:
+```swift
+enum SpeechModels {
+    static func endRetention() async
+}
+```
+
+---
+
+## 3. `AnalyzerInput`
+
+```swift
+struct AnalyzerInput : Sendable
+```
+
+The unit of audio fed into the analyzer. Wraps a single `AVAudioPCMBuffer`.
+
+```swift
+init(buffer: AVAudioPCMBuffer)
+init(buffer: AVAudioPCMBuffer, bufferStartTime: CMTime?)
+
+let buffer: AVAudioPCMBuffer
+let bufferStartTime: CMTime?   // nil = contiguous with previous buffer
+```
+
+`bufferStartTime` allows you to skip ahead in an audio timeline. If you omit some buffers (a gap), supply the correct `CMTime` timestamp of the resumed buffer so module results carry correct time-codes. The analyzer reconfigures modules if the audio format changes between buffers.
+
+---
+
+## 4. `SpeechModule` Protocol
+
+```swift
+protocol SpeechModule : AnyObject, Sendable
+```
+
+The base protocol all analysis modules conform to.
+
+```swift
+var availableCompatibleAudioFormats: [AVAudioFormat] { get }  // formats this module accepts
+var results: Self.Results { get }                              // AsyncSequence of results
+
+associatedtype Result : SpeechModuleResult, Sendable
+associatedtype Results : Sendable, AsyncSequence
+```
+
+Conforming types: `SpeechTranscriber`, `DictationTranscriber`, `SpeechDetector`.
+
+### `LocaleDependentSpeechModule` Protocol
+
+```swift
+protocol LocaleDependentSpeechModule : SpeechModule
+```
+
+Adds locale-awareness. Conforming types: `SpeechTranscriber`, `DictationTranscriber`.
+
+```swift
+static var supportedLocales: [Locale] { get }
+static func supportedLocale(equivalentTo: Locale) async -> Locale?
+var selectedLocales: [Locale] { get }
+```
+
+`supportedLocale(equivalentTo:)` is the safe entry point — it maps a user locale (e.g., `Locale.current`) to a recognized framework locale (e.g., `en-US`). Always call this before constructing a module.
+
+---
+
+## 5. `SpeechTranscriber`
+
+```swift
+final class SpeechTranscriber : LocaleDependentSpeechModule, SpeechModule
+```
+
+The primary production-quality transcription module. Designed for natural conversation and general purposes. Multiple instances sharing the same configuration can share a single underlying engine.
+
+### Initializers
+
+**Preset-based (recommended):**
+```swift
+convenience init(locale: Locale, preset: SpeechTranscriber.Preset)
+```
+
+**Fully custom:**
+```swift
+convenience init(
+    locale: Locale,
+    transcriptionOptions: Set<SpeechTranscriber.TranscriptionOption>,
+    reportingOptions: Set<SpeechTranscriber.ReportingOption>,
+    attributeOptions: Set<SpeechTranscriber.ResultAttributeOption>
+)
+```
+
+### Device Support
+
+```swift
+static var isAvailable: Bool             // hardware-level availability check
+static var installedLocales: [Locale]    // already on device
+static var supportedLocales: [Locale]    // installed + downloadable
+```
+
+If `isAvailable` is `false`, fall back to `DictationTranscriber`.
+
+### `SpeechTranscriber.Preset`
+
+```swift
+struct Preset : Equatable, Hashable, Sendable
+```
+
+Five built-in presets (all extend the type, so you can add your own):
+
+| Preset | volatileResults | fastResults | alternativeTranscriptions | audioTimeRange |
+|---|---|---|---|---|
+| `.transcription` | No | No | No | No |
+| `.transcriptionWithAlternatives` | No | No | Yes | No |
+| `.timeIndexedTranscriptionWithAlternatives` | No | No | Yes | Yes |
+| `.progressiveTranscription` | Yes | Yes | No | No |
+| `.timeIndexedProgressiveTranscription` | Yes | Yes | No | Yes |
+
+You can mix and match by starting from a preset and calling `.union()` / `.subtracting()` on its option sets, then passing them to the designated initializer.
+
+Custom presets:
+```swift
+init(
+    transcriptionOptions: Set<SpeechTranscriber.TranscriptionOption>,
+    reportingOptions: Set<SpeechTranscriber.ReportingOption>,
+    attributeOptions: Set<SpeechTranscriber.ResultAttributeOption>
+)
+```
+
+### Configuration Enums
+
+**`TranscriptionOption`** — affects the text content:
+- `.etiquetteReplacements` — redacts profanity/sensitive words
+
+**`ReportingOption`** — affects result delivery timing:
+- `.volatileResults` — delivers tentative in-progress results before final (live transcription UIs)
+- `.fastResults` — favors speed over accuracy
+- `.alternativeTranscriptions` — includes N-best alternatives alongside the top result
+
+**`ResultAttributeOption`** — affects `AttributedString` metadata:
+- `.audioTimeRange` — attaches per-word/phrase `CMTimeRange` as an `AttributedString` attribute
+- `.transcriptionConfidence` — attaches 0–1 confidence scores as attributes
+
+### `SpeechTranscriber.Result`
+
+```swift
+struct Result : SpeechModuleResult, Sendable
+```
+
+Delivered via `transcriber.results` (an `AsyncSequence`):
+
+```swift
+var text: AttributedString               // best interpretation
+var alternatives: [AttributedString]     // in descending probability order
+
+// AttributedString attribute keys (used when options are enabled):
+struct TimeRangeAttribute     // CMTimeRange per text segment
+struct ConfidenceAttribute    // Float 0–1 per text segment
+
+func rangeOfAudioTimeRangeAttributes(intersecting: CMTimeRange) -> Range<AttributedString.Index>?
+```
+
+Plain text extraction:
+```swift
+let plain = String(result.text.characters)
+```
+
+---
+
+## 6. `DictationTranscriber`
+
+```swift
+final class DictationTranscriber : LocaleDependentSpeechModule, SpeechModule
+```
+
+Shares ML models with the system dictation keyboard and `SFSpeechRecognizer` (on-device mode). Supports older devices where `SpeechTranscriber` is unavailable. Does **not** support network-only locales.
+
+### Initializers
+
+```swift
+convenience init(locale: Locale, preset: DictationTranscriber.Preset)
+
+convenience init(
+    locale: Locale,
+    contentHints: Set<DictationTranscriber.ContentHint>,
+    transcriptionOptions: Set<DictationTranscriber.TranscriptionOption>,
+    reportingOptions: Set<DictationTranscriber.ReportingOption>,
+    attributeOptions: Set<DictationTranscriber.ResultAttributeOption>
+)
+```
+
+Shares the same `Preset`, `TranscriptionOption`, `ReportingOption`, `ResultAttributeOption`, and `Result` structures as `SpeechTranscriber`.
+
+### `ContentHint` (unique to `DictationTranscriber`)
+
+```swift
+struct ContentHint : Equatable, Hashable, Sendable
+```
+
+Provides audio characteristic hints to improve accuracy:
+
+| Hint | Purpose |
+|---|---|
+| `.shortForm` | Audio expected to be ~1 minute or less |
+| `.farField` | Speaker is physically distant from the microphone |
+| `.atypicalSpeech` | Heavy accent, lisp, or other speech variation |
+| `.customizedLanguage(modelConfiguration:)` | Injects a custom `SFSpeechLanguageModel` |
+
+### Accuracy Improvement
+
+- **Contextual strings**: Set `AnalysisContext.contextualStrings` with domain-specific vocabulary (names, jargon). The recognizer biases toward these words even if they're not in the base model.
+- **Custom language model**: Supply an `SFSpeechLanguageModel.Configuration` via the `.customizedLanguage` content hint. Built using `SFCustomLanguageModelData`.
+
+---
+
+## 7. `SpeechDetector`
+
+```swift
+final class SpeechDetector : SpeechModule
+```
+
+Voice Activity Detection (VAD) module. Answers the binary question "is a human speaking right now?" Used to gate transcription and save power when the audio stream is mostly silence.
+
+**Critical constraint:** Must always be used alongside `SpeechTranscriber` or `DictationTranscriber`. It cannot function independently.
+
+### Initializers
+
+```swift
+convenience init()   // default sensitivity (.medium), results not reported
+
+init(detectionOptions: SpeechDetector.DetectionOptions, reportResults: Bool)
+```
+
+### `DetectionOptions`
+
+```swift
+struct DetectionOptions : Equatable, Hashable, Sendable
+init(sensitivityLevel: SpeechDetector.SensitivityLevel)
+let sensitivityLevel: SpeechDetector.SensitivityLevel
+```
+
+### `SensitivityLevel` enum
+
+```swift
+enum SensitivityLevel : RawRepresentable, CaseIterable, Equatable, Hashable
+case low     // more forgiving, passes more marginal audio to transcriber
+case medium  // recommended for most use cases
+case high    // aggressive gating, may drop speech in noisy environments
+```
+
+The tradeoff: high sensitivity saves more power but risks dropping real speech in unfavorable conditions. Power savings must be weighed against transcription accuracy degradation.
+
+### `SpeechDetector.Result`
+
+```swift
+struct Result : SpeechModuleResult
+```
+Results only emitted if `reportResults: true` at init. Primarily useful for VAD error handling.
+
+---
+
+## 8. `SpeechModuleResult` Protocol
+
+```swift
+protocol SpeechModuleResult
+```
+
+The base result protocol all module result types conform to.
+
+```swift
+var range: CMTimeRange { get }                  // audio time range this result covers
+var isFinal: Bool { get }                       // false for volatile/tentative results
+var resultsFinalizationTime: CMTime { get }     // all results before this time are now final
+```
+
+Conforming types: `SpeechTranscriber.Result`, `DictationTranscriber.Result`, `SpeechDetector.Result`.
+
+---
+
+## 9. `AssetInventory`
+
+```swift
+final class AssetInventory
+```
+
+Manages ML model asset downloads. Assets are shared system-wide between apps and automatically updated by the system. Your app is allocated a fixed number of locale reservations to limit storage.
+
+### Installation Flow
+
+```swift
+// Step 1: Check what's needed
+static func assetInstallationRequest(
+    supporting: [any SpeechModule]
+) async throws -> AssetInstallationRequest?
+// Returns nil if everything is already installed
+
+// Step 2: Install
+try await installationRequest.downloadAndInstall()
+```
+
+Multiple calls to `downloadAndInstall()` are idempotent — the system deduplicates downloads.
+
+### Status Checking
+
+```swift
+static func status(forModules: [any SpeechModule]) async -> AssetInventory.Status
+```
+
+Returns the install/availability status for a given module set.
+
+### Locale Reservation Management
+
+```swift
+static var maximumReservedLocales: Int       // read-only quota
+static var reservedLocales: [Locale]         // currently reserved
+
+static func reserve(locale: Locale) async throws -> Bool       // manually reserve
+static func release(reservedLocale: Locale) async -> Bool      // free a slot
+```
+
+The system auto-reserves locales when you call `assetInstallationRequest(supporting:)`, but you can reserve manually if you want to guarantee locale availability before analysis. Release reservations for locales you no longer need to stay within quota.
+
+---
+
+## 10. `AssetInstallationRequest`
+
+```swift
+@objc final class AssetInstallationRequest : NSObject, ProgressReporting, Sendable
+```
+
+Obtained from `AssetInventory.assetInstallationRequest(supporting:)`. Conforms to `ProgressReporting`, so you can observe its `progress` property for download UI.
+
+```swift
+func downloadAndInstall() async throws
+```
+
+The only method. Await it to block until installation is complete.
+
+---
+
+## 11. `AnalysisContext`
+
+```swift
+final class AnalysisContext : Sendable
+```
+
+Shared contextual metadata that informs multiple analyzers or a running session.
+
+```swift
+init()
+
+// Vocabulary hints
+var contextualStrings: [AnalysisContext.ContextualStringsTag : [String]]
+struct ContextualStringsTag
+
+// App-specific passthrough data
+var userData: [AnalysisContext.UserDataTag : any Sendable]
+struct UserDataTag
+```
+
+Contextual strings are grouped by semantic tag (e.g., contact names vs. app commands). The recognizer biases toward these strings even when they aren't part of the baseline model vocabulary. Can be set at analyzer creation or updated mid-session via `setContext(_:)`.
+
+---
+
+## 12. `SpeechModels`
+
+```swift
+enum SpeechModels
+```
+
+A namespace with a single method:
+
+```swift
+static func endRetention() async
+```
+
+Globally releases all ML model caches held by retained analyzer instances. Call this when your app is backgrounding or memory pressure is high and you no longer need fast analyzer re-instantiation.
+
+---
+
+## Data Flow Summary
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Your App                                │
+│                                                                 │
+│  AsyncStream<AnalyzerInput>           Module result iteration   │
+│  ┌──────────────────────────┐         ┌──────────────────────┐  │
+│  │ inputBuilder.yield(...)  │         │ for await result in  │  │
+│  │ inputBuilder.finish()    │         │   transcriber.results│  │
+│  └────────────┬─────────────┘         └──────────┬───────────┘  │
+│               │                                  ▲              │
+└───────────────┼──────────────────────────────────┼──────────────┘
+                │                                  │
+                ▼                                  │
+┌──────────────────────────────────────────────────────────────┐
+│                     SpeechAnalyzer (actor)                   │
+│                                                              │
+│  analyzeSequence(inputSequence) ──► internal task mgmt      │
+│                                                              │
+│  Modules: [SpeechDetector, SpeechTranscriber]               │
+│           ▲ gate with VAD          ▲ produces results        │
+│                                                              │
+│  finalize(through:) / cancelAnalysis(before:) / finish()    │
+└──────────────────────────────────────────────────────────────┘
+                ▲
+                │
+┌───────────────────────────┐
+│       AnalyzerInput       │
+│  (AVAudioPCMBuffer        │
+│   + optional CMTime)      │
+└───────────────────────────┘
+```
+
+---
+
+## Canonical 8-Step Usage Pattern
+
+1. **Check locale** — `SpeechTranscriber.supportedLocale(equivalentTo: Locale.current)`
+2. **Create modules** — `SpeechTranscriber(locale:preset:)`, optionally `SpeechDetector()`
+3. **Install assets** — `AssetInventory.assetInstallationRequest(supporting:)` → `.downloadAndInstall()`
+4. **Get audio format** — `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:)`
+5. **Create input stream** — `AsyncStream.makeStream(of: AnalyzerInput.self)`
+6. **Create analyzer** — `SpeechAnalyzer(modules:options:)`
+7. **Feed audio** (Task A) — convert buffers → `AnalyzerInput` → `inputBuilder.yield()`
+8. **Consume results** (Task B) — `for try await result in transcriber.results { ... }`
+9. **Run analysis** — `try await analyzer.analyzeSequence(inputSequence)`
+10. **Finish session** — `finalizeAndFinish(through: lastSampleTime)` or `cancelAndFinishNow()`
+
+---
+
+## Key Design Principles for Your Agent
+
+- **No audio conversion inside the framework** — caller is responsible for format conversion to whatever `bestAvailableAudioFormat` returns.
+- **AsyncSequence everywhere** — all results are push-based via `AsyncSequence`; no delegates.
+- **Actor isolation** — `SpeechAnalyzer` is an `actor`; all method calls are implicitly async.
+- **Asset lifecycle is separate from session lifecycle** — models persist on disk across app launches; sessions are ephemeral.
+- **Volatile vs. final results** — results with `isFinal == false` will be re-sent with corrections; update your UI accordingly rather than appending.
+- **One input sequence at a time** — calling `start(inputSequence:)` again replaces the prior sequence; the session does not automatically reset the timeline.
+- **Errors are fatal to the session** — any thrown error from a result stream also terminates all other result streams and the analyzer itself.

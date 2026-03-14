@@ -281,7 +281,6 @@ struct SettingsView: View {
                             }
                             .padding(14)
 
-                            #if targetEnvironment(macCatalyst)
                             Divider().background(Theme.border)
 
                             HStack {
@@ -297,7 +296,6 @@ struct SettingsView: View {
                                 .tint(Theme.accent)
                             }
                             .padding(14)
-                            #endif
                         }
                         .background(Theme.surface)
                         .clipShape(RoundedRectangle(cornerRadius: cardRadius, style: .continuous))

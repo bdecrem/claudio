@@ -1,0 +1,73 @@
+The Android node's Chat sheet uses the gateway's primary session key (main), so history and replies are shared with WebChat and other clients: 
+ 
+ So here's the real answer: 
+ 
+ You don't have to give up streaming. The WebSocket protocol already has chat.subscribe which pushes events. The flow 
+ would be: 
+ 
+ 1. Connect to wss://gateway:18789 (through ngrok) 
+ 2. Auth with the gateway token 
+ 3. chat.history to load conversation 
+ 4. chat.send to send a message (shares the main session with TUI/webchat/Discord/everything) 
+ 5. chat.subscribe to get push updates — responses come back as events, likely chunk by chunk 
+ 
+ This is exactly what the Android app and the macOS webchat already do. Claudio just needs to implement the same 
+ WebSocket RPC protocol instead of HTTP POST. It's more work upfront but then you get shared context, streaming, AND 
+ push updates for free. 
+ 
+ Want me to dig deeper into the exact WebSocket RPC message format so you have a spec to implement against? 
+
+ 
+ JESUS SFUCKING CHRIST. ALL I WANT IS MY CLAUDIO APP TO FUCKING WORK WELL AND BE A PEER TO DISCORD AND SO ON AND SO ON. 
+ WHEN I ASEKD CLAUDE TO LOOK AT THE FUCKING REFERENCE APP FROM OPENCLAW.IO IT TOLD ME TO SET UP THIS WHOLE NEW THING, 
+ AND NOW I'M TRYING TO MAKE THAT WORK. 
+ 
+
+ OK. Claudio should just use the WebSocket, same as the Android app and webchat. That's the reference implementation. 
+ The HTTP endpoint was a detour. 
+ 
+ Here's what Claudio needs to do — three RPC calls over one WebSocket connection: 
+ 
+ 1. Connect: wss://4209e64fa5a9.ngrok.app with auth token 
+ 2. chat.history — load conversation 
+ 3. chat.send — send messages 
+ 4. chat.subscribe — receive responses in real time 
+ 
+ That's it. Shared session, streaming, peer to everything else. The Android app source is the reference. 
+ 
+ Want me to find the exact WebSocket message format from the OpenClaw source so you can hand it to Claude to implement? 
+
+ 
+ YES 
+ 
+
+ Done. The full spec is at ~/.openclaw/workspace/CLAUDIO-WS-SPEC.md. Hand that to Claude and it has everything it 
+ needs: 
+ 
+ - Connection: WebSocket with Ed25519 device auth + challenge signing 
+ - Client ID: openclaw-ios, mode ui 
+ - Chat: chat.history to load, chat.send (non-blocking) to send, chat events for streaming responses 
+ - Agent picker: agents.list + agent.identity.get 
+ - Streaming: delta events contain accumulating text — display it for the typing effect 
+ - Pairing: first remote connect needs openclaw devices approve on the server 
+ 
+ No HTTP proxy needed. No separate endpoints. One WebSocket connection, shared session with everything else. 
+
+ 
+ and does this give me all the modern magic you were talking about for voice chat and phone calls etc etc or are we 
+ giving that up again? 
+ 
+
+ You keep everything. The WebSocket is the foundation for ALL of it: 
+ 
+ - Streaming text — chat events with delta state, word-by-word typing ✅ 
+ - Push notifications — the server can send events anytime (agent needs attention, new message from another channel) → 
+ trigger APNs push ✅ 
+ - Voice — Apple STT on device → send transcribed text via chat.send → receive response via chat event → TTS playback. 
+ Same pipe, just audio in/out wrapped around it ✅ 
+ - CallKit (agent calls you) — server sends a custom event → app wakes via push → shows incoming call UI → opens voice 
+ session on the same WebSocket ✅ 
+ - Shared session — same conversation as TUI, Discord, webchat, everything ✅ 
+ 
+ The HTTP endpoint was a dead end. The WebSocket gives you everything the HTTP could do plus push, plus shared session, 
+ plus the path to voice and calls. You're not giving anything up — you're gaining. 
