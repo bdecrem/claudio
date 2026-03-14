@@ -23,9 +23,10 @@ func (r *Router) handleRoomsSend(client *ws.Client, req ws.RPCRequest) {
 	senderEmoji := ""
 
 	if client.IsGuest() {
+		// Allow if room is public OR guest joined via invite code (is subscribed)
 		isPublic, _ := r.DB.IsRoomPublic(roomID)
-		if !isPublic {
-			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only send in public rooms"))
+		if !isPublic && !r.Hub.IsClientSubscribed(roomID, client) {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only send in rooms they have joined"))
 			return
 		}
 	} else {
@@ -91,8 +92,8 @@ func (r *Router) handleRoomsHistory(client *ws.Client, req ws.RPCRequest) {
 	// Verify access
 	if client.IsGuest() {
 		isPublic, _ := r.DB.IsRoomPublic(roomID)
-		if !isPublic {
-			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access public rooms"))
+		if !isPublic && !r.Hub.IsClientSubscribed(roomID, client) {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access rooms they have joined"))
 			return
 		}
 	} else {

@@ -225,8 +225,8 @@ func (r *Router) handleRoomsInfo(client *ws.Client, req ws.RPCRequest) {
 	// Verify access
 	if client.IsGuest() {
 		isPublic, _ := r.DB.IsRoomPublic(roomID)
-		if !isPublic {
-			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access public rooms"))
+		if !isPublic && !r.Hub.IsClientSubscribed(roomID, client) {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Guests can only access rooms they have joined"))
 			return
 		}
 	} else {

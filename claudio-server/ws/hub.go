@@ -146,6 +146,16 @@ func (h *Hub) GetRoomOnlineClients(roomID string) []RoomOnlineInfo {
 	return result
 }
 
+// IsClientSubscribed checks if a client is subscribed to a room.
+func (h *Hub) IsClientSubscribed(roomID string, client *Client) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if subs, ok := h.roomSubs[roomID]; ok {
+		return subs[client]
+	}
+	return false
+}
+
 func (h *Hub) handleMessage(client *Client, data []byte) {
 	var msg RPCMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
