@@ -10,8 +10,10 @@ import (
 	"github.com/nicebartender/claudio-server/ws"
 )
 
-// dispatchAgentMentions checks for @mentions of agents in a message and dispatches to OpenClaw
-func (r *Router) dispatchAgentMentions(roomID string, msg *db.Message) {
+// dispatchAgentResponses sends every human message to all agents in the room.
+// Agents that are @mentioned respond immediately. All other agents also see the
+// message so they can participate in the conversation naturally.
+func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 	// Skip messages from agents (prevent loops)
 	if msg.SenderAgentID != nil {
 		return
@@ -27,12 +29,7 @@ func (r *Router) dispatchAgentMentions(roomID string, msg *db.Message) {
 			continue
 		}
 
-		mention := "@" + strings.ToLower(p.DisplayName)
-		if !strings.Contains(strings.ToLower(msg.Content), mention) {
-			continue
-		}
-
-		slog.Info("agent mentioned", "agent", p.DisplayName, "agentId", p.AgentID, "roomId", roomID)
+		slog.Info("dispatching to agent", "agent", p.DisplayName, "agentId", p.AgentID, "roomId", roomID)
 
 		r.Hub.BroadcastToRoom(roomID, ws.NewEvent("room.typing", map[string]interface{}{
 			"roomId":      roomID,
@@ -80,10 +77,15 @@ func buildContextMessage(messages []db.Message, agentName string) string {
 	if len(messages) == 0 {
 		return "Hello"
 	}
-	// Just send the last message as the prompt — the agent's session
-	// on OpenClaw doesn't share our room history, so we provide context.
-	last := messages[len(messages)-1]
-	return last.Content
+	// Build context from recent messages so the agent knows who said what.
+	// Messages come newest-first from DB, reverse for chronological order.
+	var lines []string
+	for i := len(messages) - 1; i >= 0; i-- {
+		m := messages[i]
+		name := m.SenderDisplayName
+		lines = append(lines, fmt.Sprintf("[%s]: %s", name, m.Content))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (r *Router) postAgentMessage(roomID string, agent db.Participant, content string) {

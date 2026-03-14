@@ -77,8 +77,8 @@ func (r *Router) handleRoomsSend(client *ws.Client, req ws.RPCRequest) {
 		"messageId": msg.ID,
 	}))
 
-	// Check for @mentions of agents and dispatch
-	r.dispatchAgentMentions(roomID, msg)
+	// Dispatch to all agents in the room
+	r.dispatchAgentResponses(roomID, msg)
 }
 
 func (r *Router) handleRoomsHistory(client *ws.Client, req ws.RPCRequest) {
