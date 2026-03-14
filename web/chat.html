@@ -356,6 +356,7 @@ let myDisplayName = null;
 let roomId = null;
 let pendingRequests = {};
 let typingTimeout = null;
+let pendingSendCount = 0; // number of sends awaiting response
 
 // --- Elements ---
 const joinScreen = document.getElementById('join-screen');
@@ -544,7 +545,7 @@ function sendMessage() {
   msgInput.style.height = 'auto';
 
   // Render locally immediately
-  renderMessage({
+  const localMsg = renderMessage({
     senderUserId: myUserId,
     senderDisplayName: myDisplayName,
     senderEmoji: '',
@@ -554,16 +555,41 @@ function sendMessage() {
   });
   scrollToBottom();
 
-  sendReq('rooms.send', { roomId, content: text });
+  pendingSendCount++;
+  sendReq('rooms.send', { roomId, content: text }).then(res => {
+    pendingSendCount--;
+    if (res.ok) {
+      // echo already suppressed via pendingSendCount
+    } else {
+      localMsg.style.opacity = '0.4';
+      const err = document.createElement('div');
+      err.className = 'msg-time';
+      err.style.color = 'var(--terra)';
+      err.textContent = 'Failed to send';
+      err.style.cursor = 'pointer';
+      err.onclick = () => {
+        err.textContent = 'Sending...';
+        pendingSendCount++;
+        sendReq('rooms.send', { roomId, content: text }).then(r => {
+          pendingSendCount--;
+          if (r.ok) {
+            localMsg.style.opacity = '1';
+            err.remove();
+          } else {
+            err.textContent = 'Failed to send';
+          }
+        });
+      };
+      localMsg.appendChild(err);
+    }
+  });
 }
 
 function onRoomMessage(payload) {
   if (payload.roomId !== roomId) return;
   const m = payload.message;
   // Skip our own echoed messages (already rendered locally)
-  const isOwnEcho = (myUserId && m.senderUserId === myUserId) ||
-                     (!myUserId && m.senderDisplayName === myDisplayName);
-  if (isOwnEcho) return;
+  if (pendingSendCount > 0 && m.senderDisplayName === myDisplayName) return;
   renderMessage(m);
   scrollToBottom();
 }
@@ -593,6 +619,7 @@ function renderMessage(m) {
   div.appendChild(time);
 
   messagesEl.appendChild(div);
+  return div;
 }
 
 function addSystemMsg(text) {
