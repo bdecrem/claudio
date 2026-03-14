@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Claudio Chat</title>
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f0c0a;
+    --bg-card:  #161210;
+    --terra:    #c4664a;
+    --terra-lt: #d4866a;
+    --gold:     #c4a45a;
+    --muted:    #6b5c52;
+    --text:     #d4c4bc;
+    --text-dim: #7a6a62;
+    --border:   rgba(196,102,74,0.14);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geist Mono', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- Join Screen --- */
+  #join-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 24px;
+    gap: 16px;
+  }
+
+  #join-screen h1 {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--terra-lt);
+    margin-bottom: 8px;
+  }
+
+  #join-screen input {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    text-align: center;
+  }
+
+  #join-screen input::placeholder { color: var(--text-dim); }
+  #join-screen input:focus { border-color: var(--terra); }
+
+  #join-btn {
+    padding: 10px 32px;
+    background: var(--terra);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  #join-btn:hover { background: var(--terra-lt); }
+  #join-btn:disabled { opacity: 0.4; cursor: default; }
+
+  #join-error {
+    color: var(--terra);
+    font-size: 12px;
+    min-height: 18px;
+  }
+
+  /* --- Chat Screen --- */
+  #chat-screen {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  #chat-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  #room-emoji { font-size: 20px; }
+  #room-name { font-size: 15px; color: var(--terra-lt); font-weight: 400; }
+  #room-participants { font-size: 12px; color: var(--text-dim); margin-left: auto; }
+
+  #messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .msg {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 10px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .msg-other {
+    background: var(--bg-card);
+    align-self: flex-start;
+    border: 1px solid var(--border);
+  }
+
+  .msg-self {
+    background: rgba(196,102,74,0.15);
+    align-self: flex-end;
+    border: 1px solid rgba(196,102,74,0.25);
+  }
+
+  .msg-system {
+    align-self: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 4px 0;
+    background: none;
+  }
+
+  .msg-sender {
+    font-size: 11px;
+    color: var(--gold);
+    margin-bottom: 2px;
+  }
+
+  .msg-text {
+    white-space: pre-wrap;
+  }
+
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    text-align: right;
+  }
+
+  .typing-indicator {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 4px 16px;
+    min-height: 24px;
+    flex-shrink: 0;
+  }
+
+  #input-bar {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #msg-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+  }
+
+  #msg-input::placeholder { color: var(--text-dim); }
+  #msg-input:focus { border-color: var(--terra); }
+
+  #send-btn {
+    padding: 10px 16px;
+    background: var(--terra);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    align-self: flex-end;
+  }
+
+  #send-btn:hover { background: var(--terra-lt); }
+</style>
+</head>
+<body>
+
+<!-- Join Screen -->
+<div id="join-screen">
+  <h1>claudio chat</h1>
+  <input type="text" id="name-input" placeholder="your name" maxlength="24" autocomplete="off">
+  <input type="text" id="code-input" placeholder="invite or universal code" autocomplete="off"
+         style="text-transform: uppercase; letter-spacing: 1px; font-size: 12px;">
+  <button id="join-btn">Join</button>
+  <div style="color: var(--text-dim); font-size: 12px;">Leave code blank to join the Lobby</div>
+  <div id="join-error"></div>
+</div>
+
+<!-- Chat Screen -->
+<div id="chat-screen">
+  <div id="chat-header">
+    <span id="room-emoji"></span>
+    <span id="room-name"></span>
+    <span id="room-participants"></span>
+  </div>
+  <div id="messages"></div>
+  <div class="typing-indicator" id="typing"></div>
+  <div id="input-bar">
+    <textarea id="msg-input" rows="1" placeholder="Say something..."></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+</div>
+
+<script>
+let SERVER = 'wss://claudio-server-production.up.railway.app';
+
+// --- Universal Code Decoder ---
+const UC_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const UC_LOOKUP = {};
+for (let i = 0; i < UC_CHARSET.length; i++) UC_LOOKUP[UC_CHARSET[i]] = i;
+
+function decodeUniversalCode(code) {
+  const clean = code.replace(/[-\s]/g, '').toUpperCase();
+  if (clean.length === 0) return null;
+
+  // base32 decode
+  let buffer = 0, bitsLeft = 0;
+  const bytes = [];
+  for (const ch of clean) {
+    const val = UC_LOOKUP[ch];
+    if (val === undefined) return null;
+    buffer = (buffer << 5) | val;
+    bitsLeft += 5;
+    if (bitsLeft >= 8) {
+      bitsLeft -= 8;
+      bytes.push((buffer >> bitsLeft) & 0xFF);
+    }
+  }
+
+  if (bytes.length < 3 || bytes[0] !== 0x01) return null;
+
+  // Find null separator
+  const sepIdx = bytes.indexOf(0x00, 1);
+  if (sepIdx < 0) return null;
+
+  const url = String.fromCharCode(...bytes.slice(1, sepIdx));
+  const inviteCode = String.fromCharCode(...bytes.slice(sepIdx + 1));
+  if (!url || !inviteCode) return null;
+
+  return { serverURL: 'wss://' + url, inviteCode };
+}
+
+function parseCodeInput(raw) {
+  const trimmed = raw.trim().toUpperCase();
+  if (!trimmed) return { serverURL: SERVER, inviteCode: null }; // lobby
+
+  // Try universal code first (long, has dashes)
+  if (trimmed.length > 8) {
+    const decoded = decodeUniversalCode(trimmed);
+    if (decoded) return decoded;
+  }
+
+  // Plain 8-char invite code
+  return { serverURL: SERVER, inviteCode: trimmed.replace(/[-\s]/g, '') };
+}
+
+let ws = null;
+let reqId = 0;
+let myUserId = null;
+let myDisplayName = null;
+let roomId = null;
+let pendingRequests = {};
+let typingTimeout = null;
+
+// --- Elements ---
+const joinScreen = document.getElementById('join-screen');
+const chatScreen = document.getElementById('chat-screen');
+const nameInput = document.getElementById('name-input');
+const codeInput = document.getElementById('code-input');
+const joinBtn = document.getElementById('join-btn');
+const joinError = document.getElementById('join-error');
+const messagesEl = document.getElementById('messages');
+const msgInput = document.getElementById('msg-input');
+const sendBtn = document.getElementById('send-btn');
+const typingEl = document.getElementById('typing');
+
+// Restore name from localStorage
+nameInput.value = localStorage.getItem('claudio-name') || '';
+
+// --- Join Flow ---
+joinBtn.onclick = () => startJoin();
+codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') startJoin(); });
+
+function startJoin() {
+  const name = nameInput.value.trim();
+  if (!name) {
+    joinError.textContent = 'Enter your name';
+    return;
+  }
+  const parsed = parseCodeInput(codeInput.value);
+  SERVER = parsed.serverURL;
+  localStorage.setItem('claudio-name', name);
+  joinBtn.disabled = true;
+  joinError.textContent = 'Connecting...';
+  connect(name, parsed.inviteCode);
+}
+
+// --- WebSocket ---
+function connect(displayName, inviteCode) {
+  ws = new WebSocket(SERVER);
+
+  ws.onopen = () => {
+    joinError.textContent = 'Connected, authenticating...';
+  };
+
+  ws.onclose = () => {
+    if (roomId) {
+      addSystemMsg('Disconnected. Refresh to reconnect.');
+    } else {
+      joinError.textContent = 'Connection lost. Try again.';
+      joinBtn.disabled = false;
+    }
+  };
+
+  ws.onerror = () => {
+    joinError.textContent = 'Connection failed.';
+    joinBtn.disabled = false;
+  };
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'event') {
+      handleEvent(msg.event, msg.payload);
+      return;
+    }
+
+    if (msg.type === 'res' && pendingRequests[msg.id]) {
+      pendingRequests[msg.id](msg);
+      delete pendingRequests[msg.id];
+      return;
+    }
+  };
+
+  // Wait for challenge, then authenticate as guest
+  function handleEvent(event, payload) {
+    if (event === 'connect.challenge') {
+      // Got challenge, send guest connect
+      sendReq('connect', {
+        minProtocol: 3,
+        maxProtocol: 3,
+        guest: true,
+        displayName: displayName,
+        client: {
+          id: 'webchat-ui',
+          displayName: 'Claudio Web',
+          version: '1.0.0',
+          platform: 'web',
+          mode: 'webchat'
+        }
+      }).then(res => {
+        if (!res.ok) {
+          joinError.textContent = res.error?.message || 'Auth failed';
+          joinBtn.disabled = false;
+          return;
+        }
+        myUserId = res.payload?.auth?.userId || res.payload?.userId;
+        myDisplayName = displayName;
+        joinError.textContent = 'Joining room...';
+        return joinRoom(inviteCode);
+      });
+      return;
+    }
+
+    if (event === 'room.message') {
+      onRoomMessage(payload);
+      return;
+    }
+
+    if (event === 'room.join') {
+      addSystemMsg(`${payload.displayName} joined`);
+      updateParticipantCount(1);
+      return;
+    }
+
+    if (event === 'room.leave') {
+      addSystemMsg(`${payload.displayName} left`);
+      updateParticipantCount(-1);
+      return;
+    }
+
+    if (event === 'room.typing') {
+      showTyping(payload.displayName);
+      return;
+    }
+  }
+
+  async function joinRoom(inviteCode) {
+    const params = inviteCode
+      ? { inviteCode: inviteCode }
+      : { roomId: 'lobby' };
+    const res = await sendReq('rooms.join', params);
+    if (!res.ok) {
+      joinError.textContent = res.error?.message || 'Invalid invite code';
+      joinBtn.disabled = false;
+      return;
+    }
+
+    const room = res.payload.room;
+    roomId = room.id;
+
+    // Show chat
+    joinScreen.style.display = 'none';
+    chatScreen.style.display = 'flex';
+    document.getElementById('room-emoji').textContent = room.emoji || '';
+    document.getElementById('room-name').textContent = room.name || 'Chat';
+    document.getElementById('room-participants').textContent =
+      `${(room.participants || []).length} online`;
+
+    msgInput.focus();
+
+    // Load history
+    const histRes = await sendReq('rooms.history', { roomId: roomId, limit: 50 });
+    if (histRes.ok && histRes.payload?.messages) {
+      const msgs = histRes.payload.messages;
+      // History comes newest-first, reverse for display
+      msgs.reverse().forEach(m => renderMessage(m));
+      scrollToBottom();
+    }
+  }
+}
+
+function sendReq(method, params) {
+  return new Promise(resolve => {
+    const id = 'r' + (++reqId);
+    pendingRequests[id] = resolve;
+    ws.send(JSON.stringify({ type: 'req', id, method, params }));
+  });
+}
+
+// --- Messaging ---
+sendBtn.onclick = sendMessage;
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+msgInput.addEventListener('input', () => {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+});
+
+function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || !roomId) return;
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+
+  // Render locally immediately
+  renderMessage({
+    senderUserId: myUserId,
+    senderDisplayName: myDisplayName,
+    senderEmoji: '',
+    content: text,
+    createdAt: new Date().toISOString(),
+    _local: true
+  });
+  scrollToBottom();
+
+  sendReq('rooms.send', { roomId, content: text });
+}
+
+function onRoomMessage(payload) {
+  if (payload.roomId !== roomId) return;
+  const m = payload.message;
+  // Skip our own echoed messages (already rendered locally)
+  const isOwnEcho = (myUserId && m.senderUserId === myUserId) ||
+                     (!myUserId && m.senderDisplayName === myDisplayName);
+  if (isOwnEcho) return;
+  renderMessage(m);
+  scrollToBottom();
+}
+
+function renderMessage(m) {
+  const div = document.createElement('div');
+  const isSelf = (myUserId && m.senderUserId === myUserId) ||
+                   (!myUserId && m.senderDisplayName === myDisplayName);
+  div.className = 'msg ' + (isSelf ? 'msg-self' : 'msg-other');
+
+  if (!isSelf) {
+    const sender = document.createElement('div');
+    sender.className = 'msg-sender';
+    sender.textContent = (m.senderEmoji ? m.senderEmoji + ' ' : '') + (m.senderDisplayName || 'Unknown');
+    div.appendChild(sender);
+  }
+
+  const text = document.createElement('div');
+  text.className = 'msg-text';
+  text.textContent = m.content || '';
+  div.appendChild(text);
+
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  const d = new Date(m.createdAt);
+  time.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  div.appendChild(time);
+
+  messagesEl.appendChild(div);
+}
+
+function addSystemMsg(text) {
+  const div = document.createElement('div');
+  div.className = 'msg msg-system';
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  scrollToBottom();
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+}
+
+function showTyping(name) {
+  typingEl.textContent = name + ' is typing...';
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => { typingEl.textContent = ''; }, 3000);
+}
+
+let participantCount = 0;
+function updateParticipantCount(delta) {
+  const el = document.getElementById('room-participants');
+  const current = parseInt(el.textContent) || 0;
+  participantCount = current + delta;
+  el.textContent = participantCount + ' online';
+}
+</script>
+</body>
+</html>

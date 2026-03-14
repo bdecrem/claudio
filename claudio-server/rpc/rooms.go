@@ -138,28 +138,41 @@ func (r *Router) handleRoomsJoin(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Check if already a participant
-	already, _ := r.DB.IsParticipant(roomID, client.UserID())
-	if !already {
-		if err := r.DB.AddParticipant(roomID, client.UserID(), "member"); err != nil {
-			client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
-			return
+	if client.IsGuest() {
+		// Guests just subscribe, no participant record
+		r.Hub.SubscribeRoom(roomID, client)
+
+		// Broadcast join event for guest
+		r.Hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+			"roomId":      roomID,
+			"displayName": client.DisplayName(),
+			"userId":      client.UserID(),
+			"isAgent":     false,
+		}), nil)
+	} else {
+		// Check if already a participant
+		already, _ := r.DB.IsParticipant(roomID, client.UserID())
+		if !already {
+			if err := r.DB.AddParticipant(roomID, client.UserID(), "member"); err != nil {
+				client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
+				return
+			}
+
+			// Broadcast join event
+			user, _ := r.DB.GetUser(client.UserID())
+			if user != nil {
+				r.Hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+					"roomId":      roomID,
+					"displayName": user.DisplayName,
+					"emoji":       user.AvatarEmoji,
+					"userId":      user.ID,
+				}), nil)
+			}
 		}
 
-		// Broadcast join event
-		user, _ := r.DB.GetUser(client.UserID())
-		if user != nil {
-			r.Hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
-				"roomId":      roomID,
-				"displayName": user.DisplayName,
-				"emoji":       user.AvatarEmoji,
-				"userId":      user.ID,
-			}), nil)
-		}
+		// Subscribe to room events
+		r.Hub.SubscribeRoom(roomID, client)
 	}
-
-	// Subscribe to room events
-	r.Hub.SubscribeRoom(roomID, client)
 
 	room, err := r.DB.GetRoom(roomID)
 	if err != nil {
