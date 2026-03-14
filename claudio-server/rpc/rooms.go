@@ -121,6 +121,7 @@ func (r *Router) handleRoomsJoin(client *ws.Client, req ws.RPCRequest) {
 			client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 			return
 		}
+		r.mergeOnlineGuests(room)
 		client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
 			"room": room,
 		}))
@@ -179,7 +180,7 @@ func (r *Router) handleRoomsJoin(client *ws.Client, req ws.RPCRequest) {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return
 	}
-
+	r.mergeOnlineGuests(room)
 	client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
 		"room": room,
 	}))
@@ -242,12 +243,7 @@ func (r *Router) handleRoomsInfo(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Annotate online status
-	for i, p := range room.Participants {
-		if !p.IsAgent {
-			room.Participants[i].IsOnline = r.Hub.IsUserOnline(p.ID)
-		}
-	}
+	r.mergeOnlineGuests(room)
 
 	client.SendJSON(ws.NewResponse(req.ID, map[string]interface{}{
 		"room": room,
@@ -390,4 +386,33 @@ func jsonBool(raw json.RawMessage) bool {
 		json.Unmarshal(raw, &b)
 	}
 	return b
+}
+
+// mergeOnlineGuests adds connected guests (not already in the DB participant list) to the room.
+func (r *Router) mergeOnlineGuests(room *db.Room) {
+	online := r.Hub.GetRoomOnlineClients(room.ID)
+	existing := make(map[string]bool)
+	for i, p := range room.Participants {
+		existing[p.ID] = true
+		// While we're here, mark DB participants online if they have a connection
+		if !p.IsAgent {
+			for _, o := range online {
+				if o.UserID == p.ID {
+					room.Participants[i].IsOnline = true
+					break
+				}
+			}
+		}
+	}
+	for _, o := range online {
+		if !existing[o.UserID] && o.IsGuest {
+			room.Participants = append(room.Participants, db.Participant{
+				ID:          o.UserID,
+				DisplayName: o.DisplayName,
+				IsOnline:    true,
+				Role:        "guest",
+			})
+		}
+	}
+	room.ParticipantCount = len(room.Participants)
 }

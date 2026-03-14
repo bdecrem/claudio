@@ -116,6 +116,36 @@ func (h *Hub) IsUserOnline(userID string) bool {
 	return false
 }
 
+// RoomOnlineInfo returns info about a connected client in a room.
+type RoomOnlineInfo struct {
+	UserID      string
+	DisplayName string
+	IsGuest     bool
+}
+
+// GetRoomOnlineClients returns info for all clients subscribed to a room.
+func (h *Hub) GetRoomOnlineClients(roomID string) []RoomOnlineInfo {
+	h.mu.RLock()
+	subs := h.roomSubs[roomID]
+	h.mu.RUnlock()
+
+	var result []RoomOnlineInfo
+	seen := make(map[string]bool)
+	for client := range subs {
+		uid := client.UserID()
+		if uid == "" || seen[uid] {
+			continue
+		}
+		seen[uid] = true
+		result = append(result, RoomOnlineInfo{
+			UserID:      uid,
+			DisplayName: client.DisplayName(),
+			IsGuest:     client.IsGuest(),
+		})
+	}
+	return result
+}
+
 func (h *Hub) handleMessage(client *Client, data []byte) {
 	var msg RPCMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
