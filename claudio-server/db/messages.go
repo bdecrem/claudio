@@ -89,3 +89,31 @@ func (db *DB) GetMessages(roomID string, before *time.Time, limit int) ([]Messag
 	}
 	return messages, nil
 }
+
+// GetMessagesAfter returns messages created after the given message ID, in chronological order.
+func (db *DB) GetMessagesAfter(roomID, afterID string, limit int) ([]Message, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	rows, err := db.Query(`
+		SELECT id, room_id, sender_user_id, sender_agent_id, sender_display_name, sender_emoji, content, mentions, reply_to, created_at
+		FROM messages
+		WHERE room_id = ? AND created_at > (SELECT created_at FROM messages WHERE id = ?)
+		ORDER BY created_at ASC LIMIT ?
+	`, roomID, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.RoomID, &m.SenderUserID, &m.SenderAgentID, &m.SenderDisplayName, &m.SenderEmoji, &m.Content, &m.Mentions, &m.ReplyTo, &m.CreatedAt); err != nil {
+			continue
+		}
+		messages = append(messages, m)
+	}
+	return messages, nil
+}

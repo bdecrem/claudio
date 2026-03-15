@@ -771,7 +771,7 @@ async function showAgentInvite() {
   }
   if (!currentInviteCode) return;
 
-  const joinURL = serverBase + '/agent-join/' + currentInviteCode;
+  const chatApiURL = serverBase + '/chat-api/' + currentInviteCode;
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200;padding:24px;';
@@ -785,11 +785,11 @@ async function showAgentInvite() {
 
   const desc = document.createElement('div');
   desc.style.cssText = 'color:var(--text-dim);font-size:12px;line-height:1.6;margin-bottom:16px;';
-  desc.textContent = 'Tell your OpenClaw agent to visit this URL. Copy and paste this to your agent:';
+  desc.textContent = 'Copy this and paste it to your OpenClaw agent:';
 
   const msgBox = document.createElement('div');
   msgBox.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text);line-height:1.5;word-break:break-all;cursor:pointer;user-select:all;';
-  msgBox.textContent = 'Join this chat room: ' + joinURL;
+  msgBox.textContent = 'Join this chat room: ' + chatApiURL;
 
   const hint = document.createElement('div');
   hint.style.cssText = 'color:var(--text-dim);font-size:11px;margin-top:8px;';

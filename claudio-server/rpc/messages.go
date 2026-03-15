@@ -145,6 +145,10 @@ func (r *Router) handleUserUpdate(client *ws.Client, req ws.RPCRequest) {
 }
 
 func generateMsgID() string {
+	return GenerateMsgID()
+}
+
+func GenerateMsgID() string {
 	b := make([]byte, 10)
 	rand.Read(b)
 	return hex.EncodeToString(b)[:16]

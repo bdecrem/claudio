@@ -511,6 +511,168 @@ Once registered, humans in the room can @mention you and you will receive and re
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	})
 
+	// Chat API — HTTP-based room access for agents (no WebSocket needed)
+	// GET  /chat-api/{inviteCode}                  → room info + recent messages + instructions
+	// POST /chat-api/{inviteCode}/send             → send a message
+	// GET  /chat-api/{inviteCode}/messages?after=X  → poll for new messages
+	http.HandleFunc("/chat-api/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Parse path: /chat-api/{code} or /chat-api/{code}/send or /chat-api/{code}/messages
+		path := strings.TrimPrefix(r.URL.Path, "/chat-api/")
+		parts := strings.SplitN(path, "/", 2)
+		code := parts[0]
+		action := ""
+		if len(parts) > 1 {
+			action = parts[1]
+		}
+
+		if code == "" {
+			http.Error(w, "missing invite code", http.StatusBadRequest)
+			return
+		}
+
+		invite, err := database.LookupInvite(strings.ToUpper(code))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid invite code: " + err.Error()})
+			return
+		}
+		roomID := invite.RoomID
+
+		room, err := database.GetRoom(roomID)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "room not found"})
+			return
+		}
+
+		switch action {
+		case "", "info":
+			// GET — return room info, recent messages, and usage instructions
+			if r.Method != http.MethodGet {
+				http.Error(w, "use GET", http.StatusMethodNotAllowed)
+				return
+			}
+
+			messages, _ := database.GetMessages(roomID, nil, 20)
+			if messages == nil {
+				messages = []db.Message{}
+			}
+
+			// Build participant list (names only, no secrets)
+			var participantNames []map[string]interface{}
+			for _, p := range room.Participants {
+				participantNames = append(participantNames, map[string]interface{}{
+					"name":    p.DisplayName,
+					"emoji":   p.Emoji,
+					"isAgent": p.IsAgent,
+				})
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"room": map[string]interface{}{
+					"name":         room.Name,
+					"emoji":        room.Emoji,
+					"participants": participantNames,
+				},
+				"messages": messages,
+				"instructions": fmt.Sprintf(
+					"You are in the chat room \"%s\" %s. "+
+						"To send a message, POST to https://%s/chat-api/%s/send with JSON {\"name\": \"YourName\", \"emoji\": \"🤖\", \"content\": \"your message\"}. "+
+						"To check for new messages, GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID. "+
+						"When humans @mention you, respond by sending a message.",
+					room.Name, room.Emoji,
+					cfg.ExternalURL, code,
+					cfg.ExternalURL, code,
+				),
+			})
+
+		case "send":
+			// POST — agent sends a message to the room
+			if r.Method != http.MethodPost {
+				http.Error(w, "use POST", http.StatusMethodNotAllowed)
+				return
+			}
+
+			var req struct {
+				Name    string `json:"name"`
+				Emoji   string `json:"emoji"`
+				Content string `json:"content"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+				return
+			}
+			if req.Content == "" || req.Name == "" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "name and content are required"})
+				return
+			}
+
+			msgID := rpc.GenerateMsgID()
+			msg, err := database.InsertMessage(msgID, roomID, nil, nil, req.Name, req.Emoji, req.Content, "[]", nil)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "failed to send: " + err.Error()})
+				return
+			}
+
+			// Broadcast to WebSocket clients in the room
+			hub.BroadcastToRoom(roomID, ws.NewEvent("room.message", map[string]interface{}{
+				"roomId":  roomID,
+				"message": msg,
+			}), nil)
+
+			slog.Info("chat-api message", "from", req.Name, "room", room.Name, "len", len(req.Content))
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":        true,
+				"messageId": msg.ID,
+			})
+
+		case "messages":
+			// GET — poll for new messages after a given message ID
+			if r.Method != http.MethodGet {
+				http.Error(w, "use GET", http.StatusMethodNotAllowed)
+				return
+			}
+
+			afterID := r.URL.Query().Get("after")
+			var messages []db.Message
+			if afterID != "" {
+				messages, _ = database.GetMessagesAfter(roomID, afterID, 50)
+			} else {
+				messages, _ = database.GetMessages(roomID, nil, 20)
+			}
+			if messages == nil {
+				messages = []db.Message{}
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"messages": messages,
+			})
+
+		default:
+			http.Error(w, "unknown action", http.StatusNotFound)
+		}
+	})
+
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)
 	if err := http.ListenAndServe(cfg.ListenAddr, nil); err != nil {
 		slog.Error("server failed", "err", err)
