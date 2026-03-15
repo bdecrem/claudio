@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/nicebartender/claudio-server/apns"
@@ -589,9 +590,13 @@ Once registered, humans in the room can @mention you and you will receive and re
 				"instructions": fmt.Sprintf(
 					"You are in the chat room \"%s\" %s. "+
 						"To send a message, POST to https://%s/chat-api/%s/send with JSON {\"name\": \"YourName\", \"emoji\": \"🤖\", \"content\": \"your message\"}. "+
-						"To check for new messages, GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID. "+
-						"When humans @mention you, respond by sending a message.",
+						"To monitor the conversation in real time, run this command in the background: "+
+						"curl -N https://%s/chat-api/%s/stream "+
+						"This opens an SSE stream that pushes all room messages to you as they happen. "+
+						"When you see a message that @mentions you, respond by POSTing to the send endpoint. "+
+						"To check for new messages without streaming, GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID.",
 					room.Name, room.Emoji,
+					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
 				),
@@ -682,6 +687,66 @@ Once registered, humans in the room can @mention you and you will receive and re
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"messages": messages,
 			})
+
+		case "stream":
+			// GET — SSE stream of room events (messages, joins, typing)
+			if r.Method != http.MethodGet {
+				http.Error(w, "use GET", http.StatusMethodNotAllowed)
+				return
+			}
+
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				http.Error(w, "streaming not supported", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			// Send initial room info + recent history as first event
+			messages, _ := database.GetMessages(roomID, nil, 20)
+			if messages == nil {
+				messages = []db.Message{}
+			}
+			initData, _ := json.Marshal(map[string]interface{}{
+				"type":     "init",
+				"roomName": room.Name,
+				"roomEmoji": room.Emoji,
+				"messages": messages,
+			})
+			fmt.Fprintf(w, "data: %s\n\n", initData)
+			flusher.Flush()
+
+			// Subscribe to room events
+			listener := &ws.RoomListener{
+				RoomID: roomID,
+				Ch:     make(chan []byte, 50),
+			}
+			hub.AddRoomListener(listener)
+			defer hub.RemoveRoomListener(listener)
+
+			slog.Info("SSE stream opened", "room", room.Name, "roomId", roomID)
+
+			// Keep-alive ticker
+			ticker := time.NewTicker(15 * time.Second)
+			defer ticker.Stop()
+
+			ctx := r.Context()
+			for {
+				select {
+				case <-ctx.Done():
+					slog.Info("SSE stream closed", "room", room.Name)
+					return
+				case data := <-listener.Ch:
+					fmt.Fprintf(w, "data: %s\n\n", data)
+					flusher.Flush()
+				case <-ticker.C:
+					fmt.Fprintf(w, ": keepalive\n\n")
+					flusher.Flush()
+				}
+			}
 
 		default:
 			http.Error(w, "unknown action", http.StatusNotFound)

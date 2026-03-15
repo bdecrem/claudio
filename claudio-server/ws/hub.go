@@ -11,6 +11,12 @@ import (
 	"github.com/nicebartender/claudio-server/db"
 )
 
+// RoomListener is a channel-based subscriber for room events (used by SSE streams).
+type RoomListener struct {
+	RoomID string
+	Ch     chan []byte // JSON-encoded event
+}
+
 type Hub struct {
 	clients    map[*Client]bool
 	register   chan *Client
@@ -20,17 +26,22 @@ type Hub struct {
 	roomSubs map[string]map[*Client]bool
 	mu       sync.RWMutex
 
+	// Channel-based room listeners (for SSE/HTTP streams)
+	roomListeners map[string]map[*RoomListener]bool
+	listenerMu    sync.RWMutex
+
 	DB        *db.DB
 	RPCRouter func(client *Client, req RPCRequest)
 }
 
 func NewHub(database *db.DB) *Hub {
 	return &Hub{
-		clients:    make(map[*Client]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		roomSubs:   make(map[string]map[*Client]bool),
-		DB:         database,
+		clients:       make(map[*Client]bool),
+		register:      make(chan *Client),
+		unregister:    make(chan *Client),
+		roomSubs:      make(map[string]map[*Client]bool),
+		roomListeners: make(map[string]map[*RoomListener]bool),
+		DB:            database,
 	}
 }
 
@@ -91,6 +102,44 @@ func (h *Hub) BroadcastToRoom(roomID string, event RPCEvent, exclude *Client) {
 	for client := range subs {
 		if client != exclude {
 			client.SendJSON(event)
+		}
+	}
+
+	// Also notify SSE/HTTP listeners
+	h.listenerMu.RLock()
+	listeners := h.roomListeners[roomID]
+	h.listenerMu.RUnlock()
+
+	if len(listeners) > 0 {
+		data, _ := json.Marshal(event)
+		for listener := range listeners {
+			select {
+			case listener.Ch <- data:
+			default:
+				// listener is slow, skip
+			}
+		}
+	}
+}
+
+// AddRoomListener registers a channel-based listener for room events.
+func (h *Hub) AddRoomListener(listener *RoomListener) {
+	h.listenerMu.Lock()
+	defer h.listenerMu.Unlock()
+	if h.roomListeners[listener.RoomID] == nil {
+		h.roomListeners[listener.RoomID] = make(map[*RoomListener]bool)
+	}
+	h.roomListeners[listener.RoomID][listener] = true
+}
+
+// RemoveRoomListener unregisters a channel-based listener.
+func (h *Hub) RemoveRoomListener(listener *RoomListener) {
+	h.listenerMu.Lock()
+	defer h.listenerMu.Unlock()
+	if subs, ok := h.roomListeners[listener.RoomID]; ok {
+		delete(subs, listener)
+		if len(subs) == 0 {
+			delete(h.roomListeners, listener.RoomID)
 		}
 	}
 }
