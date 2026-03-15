@@ -85,13 +85,13 @@ struct AddAgentSheet: View {
             }
             .background(Theme.background)
             .navigationTitle("Add Agents")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .compatLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .compatTrailing) {
                     Button("Add") {
                         addSelectedAgents()
                     }

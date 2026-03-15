@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Theme Manager (persists user's appearance preferences)
 
@@ -42,10 +45,17 @@ final class ThemeManager {
             if self.transparentTitleBar {
                 titlebar.titleVisibility = .hidden
                 titlebar.separatorStyle = .none
-                // Let content extend into the title bar area
                 windowScene.titlebar?.toolbar = nil
             }
-            // When off, just leave defaults — don't force a toolbar visible
+        }
+        #elseif os(macOS)
+        DispatchQueue.main.async {
+            guard let window = NSApplication.shared.windows.first else { return }
+            if self.transparentTitleBar {
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.styleMask.insert(.fullSizeContentView)
+            }
         }
         #endif
     }
@@ -140,9 +150,15 @@ extension Color {
     }
 
     func toHex() -> String {
+        #if os(iOS)
         let ui = UIColor(self)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         ui.getRed(&r, green: &g, blue: &b, alpha: &a)
         return String(format: "%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+        #elseif os(macOS)
+        let ns = NSColor(self)
+        guard let rgb = ns.usingColorSpace(.sRGB) else { return "000000" }
+        return String(format: "%02X%02X%02X", Int(rgb.redComponent * 255), Int(rgb.greenComponent * 255), Int(rgb.blueComponent * 255))
+        #endif
     }
 }

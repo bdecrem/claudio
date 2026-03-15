@@ -1,5 +1,8 @@
 import SwiftUI
 import PhotosUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct ChatView: View {
     @Bindable var chatService: ChatService
@@ -291,8 +294,8 @@ struct ChatView: View {
                             HStack(spacing: 8) {
                                 ForEach(pendingImages) { img in
                                     ZStack(alignment: .topTrailing) {
-                                        if let uiImage = UIImage(data: img.data) {
-                                            Image(uiImage: uiImage)
+                                        if let swiftImage = platformImage(from: img.data) {
+                                            swiftImage
                                                 .resizable()
                                                 .aspectRatio(contentMode: .fill)
                                                 .frame(width: 56, height: 56)
@@ -432,7 +435,7 @@ struct ChatView: View {
             Task { await loadSelectedPhotos(items) }
             selectedPhotos = []
         }
-        .fullScreenCover(isPresented: $showVoiceSession) {
+        .platformFullScreen(isPresented: $showVoiceSession) {
             VoiceSessionView(
                 voiceService: voiceService,
                 onDismiss: { endVoiceSession() }
@@ -567,7 +570,7 @@ struct ChatView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(Theme.textSecondary)
                 .padding(6)
-                .hoverEffect(.lift)
+                .platformHoverEffect()
         }
         .keyboardShortcut(",", modifiers: .command)
     }
@@ -667,6 +670,7 @@ struct ChatView: View {
     }
 
     private func resizeImageData(_ data: Data, maxDimension: CGFloat) -> Data? {
+        #if os(iOS)
         guard let image = UIImage(data: data) else { return nil }
         let size = image.size
         let scale = min(maxDimension / max(size.width, size.height), 1.0)
@@ -676,6 +680,19 @@ struct ChatView: View {
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
         return resized.jpegData(compressionQuality: 0.7)
+        #elseif os(macOS)
+        guard let image = NSImage(data: data) else { return nil }
+        let size = image.size
+        let scale = min(maxDimension / max(size.width, size.height), 1.0)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let resized = NSImage(size: newSize)
+        resized.lockFocus()
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        resized.unlockFocus()
+        guard let tiff = resized.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.7])
+        #endif
     }
 
     private func startVoiceSession() {

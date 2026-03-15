@@ -51,6 +51,7 @@
 		K10000010000000000000001 /* CachedMediaImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = K20000010000000000000001 /* CachedMediaImage.swift */; };
 		HT1000010000000000000001 /* HTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = HT2000010000000000000001 /* HTTPTransport.swift */; };
 		HT1000010000000000000002 /* HTTPTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HT2000010000000000000002 /* HTTPTransportTests.swift */; };
+		PC1000010000000000000001 /* PlatformCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = PC2000010000000000000001 /* PlatformCompat.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -102,6 +103,7 @@
 		K20000010000000000000001 /* CachedMediaImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedMediaImage.swift; sourceTree = "<group>"; };
 		HT2000010000000000000001 /* HTTPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTransport.swift; sourceTree = "<group>"; };
 		HT2000010000000000000002 /* HTTPTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPTransportTests.swift; sourceTree = "<group>"; };
+		PC2000010000000000000001 /* PlatformCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformCompat.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -218,6 +220,7 @@
 			isa = PBXGroup;
 			children = (
 				A2000001000000000000000C /* Theme.swift */,
+				PC2000010000000000000001 /* PlatformCompat.swift */,
 			);
 			path = Theme;
 			sourceTree = "<group>";
@@ -384,6 +387,7 @@
 				M10000010000000000000001 /* MediaImageCache.swift in Sources */,
 				K10000010000000000000001 /* CachedMediaImage.swift in Sources */,
 				HT1000010000000000000001 /* HTTPTransport.swift in Sources */,
+				PC1000010000000000000001 /* PlatformCompat.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -475,11 +479,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -506,11 +513,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kochito.claudio;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SUPPORTS_MACCATALYST = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

@@ -41,14 +41,14 @@ struct JoinRoomSheet: View {
             }
             .background(Theme.background)
             .navigationTitle("Join Room")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .compatLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(Theme.textSecondary)
                 }
                 if mode == .inviteCode {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .compatTrailing) {
                         Button("Join") {
                             joinWithInviteCode()
                         }
@@ -169,7 +169,7 @@ struct JoinRoomSheet: View {
                 .foregroundStyle(Theme.textPrimary)
                 .tint(Theme.accent)
                 .multilineTextAlignment(.center)
-                .textInputAutocapitalization(.characters)
+                .platformAutocapitalization(.characters)
                 .autocorrectionDisabled()
                 .padding(14)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

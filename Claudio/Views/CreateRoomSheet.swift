@@ -76,13 +76,13 @@ struct CreateRoomSheet: View {
             }
             .background(Theme.background)
             .navigationTitle("New Room")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .compatLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundStyle(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .compatTrailing) {
                     Button("Create") {
                         isCreating = true
                         Task {

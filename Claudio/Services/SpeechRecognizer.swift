@@ -27,6 +27,7 @@ final class SpeechRecognizer {
             }
         }
 
+        #if os(iOS)
         AVAudioApplication.requestRecordPermission { [weak self] granted in
             DispatchQueue.main.async {
                 if !granted {
@@ -34,11 +35,13 @@ final class SpeechRecognizer {
                 }
             }
         }
+        #endif
     }
 
     func startListening() {
         guard let recognizer, recognizer.isAvailable else { return }
 
+        #if os(iOS)
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -46,6 +49,7 @@ final class SpeechRecognizer {
         } catch {
             return
         }
+        #endif
 
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest else { return }

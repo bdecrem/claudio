@@ -1,6 +1,10 @@
 import Foundation
 import UserNotifications
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 import os
 
 private let log = Logger(subsystem: "com.claudio.app", category: "Notifications")
@@ -70,7 +74,11 @@ final class NotificationService {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
             permissionState = granted ? .authorized : .denied
             if granted {
+                #if os(iOS)
                 UIApplication.shared.registerForRemoteNotifications()
+                #elseif os(macOS)
+                NSApplication.shared.registerForRemoteNotifications()
+                #endif
                 log.info("Push permission granted, registering for remote notifications")
             } else {
                 log.info("Push permission denied by user")
@@ -88,7 +96,11 @@ final class NotificationService {
             case .authorized, .provisional, .ephemeral:
                 permissionState = .authorized
                 // Always re-register on launch — APNs tokens can change between builds
+                #if os(iOS)
                 UIApplication.shared.registerForRemoteNotifications()
+                #elseif os(macOS)
+                NSApplication.shared.registerForRemoteNotifications()
+                #endif
             case .denied:
                 permissionState = .denied
             case .notDetermined:

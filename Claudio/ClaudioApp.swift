@@ -2,7 +2,11 @@ import SwiftUI
 
 @main
 struct ClaudioApp: App {
+    #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
     @State private var showLaunch = true
     @State private var chatService = ChatService()
     @Environment(\.scenePhase) private var scenePhase

@@ -5,13 +5,13 @@ struct CachedMediaImage: View {
     let serverURL: String
     let token: String
 
-    @State private var image: UIImage?
+    @State private var image: PlatformImage?
     @State private var failed = false
 
     var body: some View {
         Group {
             if let image {
-                Image(uiImage: image)
+                platformSwiftUIImage(image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: 280)
@@ -45,4 +45,13 @@ struct CachedMediaImage: View {
             }
         }
     }
+}
+
+/// Convert a PlatformImage to a SwiftUI Image
+private func platformSwiftUIImage(_ img: PlatformImage) -> Image {
+    #if os(iOS)
+    Image(uiImage: img)
+    #elseif os(macOS)
+    Image(nsImage: img)
+    #endif
 }

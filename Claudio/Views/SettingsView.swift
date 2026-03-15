@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 /// Muted text for settings rows
 private var settingsText: Color { Theme.textSecondary }
@@ -242,7 +245,7 @@ struct SettingsView: View {
                                     .foregroundStyle(Theme.textPrimary)
                                     .frame(width: 72)
                                     .autocorrectionDisabled()
-                                    .textInputAutocapitalization(.characters)
+                                    .platformAutocapitalization(.characters)
                                     .multilineTextAlignment(.trailing)
                                     .onChange(of: backgroundHex) { _, newValue in
                                         let cleaned = newValue.trimmingCharacters(in: .alphanumerics.inverted)
@@ -321,7 +324,7 @@ struct SettingsView: View {
                                                 .foregroundStyle(settingsText)
                                                 .tint(Theme.accent)
                                                 .autocorrectionDisabled()
-                                                .textInputAutocapitalization(.characters)
+                                                .platformAutocapitalization(.characters)
                                         }
 
                                         Button {
@@ -390,7 +393,7 @@ struct SettingsView: View {
                                 .font(Theme.body)
                                 .foregroundStyle(settingsText)
                                 .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
+                                .platformAutocapitalization(.never)
                             }
                             .padding(14)
                             .background(Theme.surface)
@@ -562,13 +565,13 @@ struct SettingsView: View {
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(Theme.textDim.opacity(0.4))
                             .onTapGesture {
-                                UIPasteboard.general.string = DeviceIdentity.shared.deviceId
+                                copyToClipboard(DeviceIdentity.shared.deviceId)
                             }
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 10))
                             .foregroundStyle(Theme.textDim.opacity(0.3))
                             .onTapGesture {
-                                UIPasteboard.general.string = DeviceIdentity.shared.deviceId
+                                copyToClipboard(DeviceIdentity.shared.deviceId)
                             }
                     }
                     .padding(.horizontal, 24)
@@ -576,7 +579,9 @@ struct SettingsView: View {
                 .padding(.bottom, 40)
             }
             .background(Theme.background)
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
             .safeAreaInset(edge: .top) {
                 HStack {
                     // Balance spacer for centering
@@ -633,7 +638,7 @@ struct SettingsView: View {
                 )
             }
         }
-        .fullScreenCover(isPresented: $showQRScanner) {
+        .platformFullScreen(isPresented: $showQRScanner) {
             QRScannerView(
                 onScanned: { url, token in
                     chatService.addServer(url: url, token: token)
@@ -749,7 +754,7 @@ private struct ServerEditSheet: View {
                                     .foregroundStyle(Theme.textPrimary)
                                     .tint(Theme.accent)
                                     .autocorrectionDisabled()
-                                    .textInputAutocapitalization(.words)
+                                    .platformAutocapitalization(.words)
                             }
                         }
                         .padding(14)
@@ -771,9 +776,11 @@ private struct ServerEditSheet: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(Theme.textPrimary)
                                 .tint(Theme.accent)
+                                #if os(iOS)
                                 .keyboardType(.URL)
+                                #endif
                                 .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
+                                .platformAutocapitalization(.never)
                         }
                     }
                     .padding(14)
@@ -789,7 +796,7 @@ private struct ServerEditSheet: View {
                             .foregroundStyle(Theme.textPrimary)
                             .tint(Theme.accent)
                             .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                            .platformAutocapitalization(.never)
                     }
                     .padding(14)
 
@@ -855,13 +862,13 @@ private struct ServerEditSheet: View {
             }
             .background(Theme.background)
             .navigationTitle(isNew ? "Add Server" : "Edit Server")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .compatLeading) {
                     Button("Cancel", action: onCancel)
                         .foregroundStyle(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .compatTrailing) {
                     Button("Save", action: onSave)
                         .foregroundStyle(Theme.accent)
                         .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -975,9 +982,11 @@ private struct NotificationSettingsSection: View {
     }
 
     private func openAppSettings() {
+        #if os(iOS)
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
+        #endif
     }
 }
 
@@ -1024,9 +1033,11 @@ private struct ClaudioBackendSection: View {
                                 .font(.system(size: 15))
                                 .foregroundStyle(settingsText)
                                 .tint(Theme.accent)
+                                #if os(iOS)
                                 .keyboardType(.URL)
+                                #endif
                                 .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
+                                .platformAutocapitalization(.never)
                                 .onChange(of: url) { _, newValue in
                                     roomService.backendURL = newValue
                                 }
@@ -1045,7 +1056,7 @@ private struct ClaudioBackendSection: View {
                             .foregroundStyle(settingsText)
                             .tint(Theme.accent)
                             .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
+                            .platformAutocapitalization(.never)
                             .onChange(of: token) { _, newValue in
                                 roomService.backendToken = newValue
                             }

@@ -26,7 +26,7 @@ struct RoomListView: View {
         .sheet(isPresented: $showJoinRoom) {
             JoinRoomSheet(roomService: roomService)
         }
-        .fullScreenCover(item: $selectedRoom) { room in
+        .platformFullScreen(item: $selectedRoom) { room in
             RoomChatView(roomService: roomService, chatService: chatService, room: room)
             .preferredColorScheme(Theme.colorScheme)
         }

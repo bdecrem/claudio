@@ -48,7 +48,7 @@ struct RoomSettingsView: View {
                                         }
                                         Spacer()
                                         Button {
-                                            UIPasteboard.general.string = displayCode
+                                            copyToClipboard(displayCode)
                                         } label: {
                                             Label("Copy", systemImage: "doc.on.doc")
                                                 .font(.system(size: 13))
@@ -159,7 +159,9 @@ struct RoomSettingsView: View {
                 .padding(.bottom, 40)
             }
             .background(Theme.background)
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
             .safeAreaInset(edge: .top) {
                 HStack {
                     Color.clear.frame(width: 56, height: 1)

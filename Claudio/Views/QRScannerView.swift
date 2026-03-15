@@ -6,13 +6,16 @@ struct QRScannerView: View {
     let onCancel: () -> Void
 
     @State private var error: String?
+    #if os(iOS)
     @State private var cameraAuthorized = false
     @State private var permissionDenied = false
+    #endif
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+            #if os(iOS)
             if cameraAuthorized {
                 QRCameraView { code in
                     guard let (url, token) = decodeQR(code) else {
@@ -23,6 +26,7 @@ struct QRScannerView: View {
                 }
                 .ignoresSafeArea()
             }
+            #endif
 
             VStack {
                 HStack {
@@ -36,6 +40,7 @@ struct QRScannerView: View {
                 }
                 Spacer()
 
+                #if os(iOS)
                 if permissionDenied {
                     Text("Camera access is needed to scan QR codes.\nEnable it in Settings > Claudio.")
                         .font(.system(size: 14, design: .rounded))
@@ -48,6 +53,13 @@ struct QRScannerView: View {
                         .foregroundStyle(.white.opacity(0.8))
                         .padding(.bottom, 60)
                 }
+                #elseif os(macOS)
+                Text("QR scanning is not available on Mac.\nPaste your server URL directly in Settings.")
+                    .font(.system(size: 14, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 60)
+                #endif
             }
 
             if let error {
@@ -70,11 +82,14 @@ struct QRScannerView: View {
                 .padding(32)
             }
         }
+        #if os(iOS)
         .task {
             await requestCameraAccess()
         }
+        #endif
     }
 
+    #if os(iOS)
     private func requestCameraAccess() async {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
@@ -88,6 +103,7 @@ struct QRScannerView: View {
             permissionDenied = true
         }
     }
+    #endif
 
     private func decodeQR(_ raw: String) -> (url: String, token: String)? {
         // Pad base64 if needed — OpenClaw QR codes may omit trailing '='
@@ -103,8 +119,9 @@ struct QRScannerView: View {
     }
 }
 
-// MARK: - AVFoundation camera wrapper
+// MARK: - AVFoundation camera wrapper (iOS only)
 
+#if os(iOS)
 private struct QRCameraView: UIViewControllerRepresentable {
     let onCode: (String) -> Void
 
@@ -170,3 +187,4 @@ private class QRCameraViewController: UIViewController, AVCaptureMetadataOutputO
         onCode?(value)
     }
 }
+#endif
