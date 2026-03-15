@@ -264,6 +264,41 @@
   }
 
   #send-btn:hover { background: var(--terra-lt); }
+
+  #mention-popup {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  }
+
+  #mention-popup.open { display: block; }
+
+  .mention-item {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .mention-item:hover, .mention-item.active {
+    background: rgba(196,102,74,0.15);
+  }
+
+  .mention-item .mention-emoji { width: 20px; text-align: center; }
+  .mention-item .mention-role { color: var(--text-dim); font-size: 10px; margin-left: auto; }
 </style>
 </head>
 <body>
@@ -290,7 +325,8 @@
   </div>
   <div id="messages"></div>
   <div class="typing-indicator" id="typing"></div>
-  <div id="input-bar">
+  <div id="input-bar" style="position:relative;">
+    <div id="mention-popup"></div>
     <textarea id="msg-input" rows="1" placeholder="Say something..."></textarea>
     <button id="send-btn">Send</button>
   </div>
@@ -358,6 +394,7 @@ let pendingRequests = {};
 let typingTimeout = null;
 let pendingSendCount = 0; // number of sends awaiting response
 let currentInviteCode = null;
+let mentionActive = false;
 
 // --- Elements ---
 const joinScreen = document.getElementById('join-screen');
@@ -530,6 +567,7 @@ function sendReq(method, params) {
 // --- Messaging ---
 sendBtn.onclick = sendMessage;
 msgInput.addEventListener('keydown', e => {
+  if (mentionActive) return; // mention popup handles its own keys
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
@@ -818,6 +856,94 @@ async function showAgentInvite() {
   overlay.appendChild(card);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+}
+
+// --- @mention autocomplete ---
+const mentionPopup = document.getElementById('mention-popup');
+let mentionStart = -1; // cursor position of the '@'
+let mentionIndex = 0;  // selected item index
+let mentionMatches = [];
+
+msgInput.addEventListener('input', () => {
+  const pos = msgInput.selectionStart;
+  const text = msgInput.value;
+
+  // Find '@' before cursor with no space between
+  const before = text.substring(0, pos);
+  const atIdx = before.lastIndexOf('@');
+  if (atIdx >= 0 && !before.substring(atIdx + 1).includes(' ')) {
+    const query = before.substring(atIdx + 1).toLowerCase();
+    mentionStart = atIdx;
+    mentionMatches = participants.filter(p =>
+      p.displayName && p.displayName.toLowerCase().startsWith(query)
+    );
+    if (mentionMatches.length > 0) {
+      renderMentionPopup();
+      return;
+    }
+  }
+  closeMentionPopup();
+});
+
+msgInput.addEventListener('keydown', e => {
+  if (!mentionActive) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    mentionIndex = (mentionIndex + 1) % mentionMatches.length;
+    highlightMentionItem();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    mentionIndex = (mentionIndex - 1 + mentionMatches.length) % mentionMatches.length;
+    highlightMentionItem();
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    selectMention(mentionMatches[mentionIndex]);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closeMentionPopup();
+  }
+});
+
+function renderMentionPopup() {
+  mentionPopup.innerHTML = '';
+  mentionIndex = 0;
+  mentionMatches.forEach((p, i) => {
+    const item = document.createElement('div');
+    item.className = 'mention-item' + (i === 0 ? ' active' : '');
+    item.innerHTML = `
+      <span class="mention-emoji">${p.emoji || (p.isAgent ? '🤖' : '👤')}</span>
+      <span>${esc(p.displayName)}</span>
+      ${p.isAgent ? '<span class="mention-role">agent</span>' : ''}
+    `;
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectMention(p);
+    });
+    mentionPopup.appendChild(item);
+  });
+  mentionPopup.classList.add('open');
+  mentionActive = true;
+}
+
+function highlightMentionItem() {
+  mentionPopup.querySelectorAll('.mention-item').forEach((el, i) => {
+    el.classList.toggle('active', i === mentionIndex);
+  });
+}
+
+function selectMention(p) {
+  const before = msgInput.value.substring(0, mentionStart);
+  const after = msgInput.value.substring(msgInput.selectionStart);
+  const mention = '@' + p.displayName + ' ';
+  msgInput.value = before + mention + after;
+  msgInput.selectionStart = msgInput.selectionEnd = mentionStart + mention.length;
+  msgInput.focus();
+  closeMentionPopup();
+}
+
+function closeMentionPopup() {
+  mentionPopup.classList.remove('open');
+  mentionActive = false;
 }
 
 function esc(str) {
