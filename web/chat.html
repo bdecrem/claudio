@@ -357,6 +357,7 @@ let roomId = null;
 let pendingRequests = {};
 let typingTimeout = null;
 let pendingSendCount = 0; // number of sends awaiting response
+let currentInviteCode = null;
 
 // --- Elements ---
 const joinScreen = document.getElementById('join-screen');
@@ -494,6 +495,7 @@ function connect(displayName, inviteCode) {
 
     const room = res.payload.room;
     roomId = room.id;
+    currentInviteCode = inviteCode;
 
     // Show chat
     joinScreen.style.display = 'none';
@@ -730,6 +732,22 @@ function renderParticipantList() {
   if (sorted.length === 0) {
     popupEl.innerHTML = '<div style="padding:8px 14px;color:var(--text-dim);font-size:12px;">No participants</div>';
   }
+
+  // "Invite your agent" button
+  const inviteBtn = document.createElement('div');
+  inviteBtn.className = 'participant-item';
+  inviteBtn.style.borderTop = '1px solid var(--border)';
+  inviteBtn.style.marginTop = '4px';
+  inviteBtn.style.paddingTop = '10px';
+  inviteBtn.style.color = 'var(--terra-lt)';
+  inviteBtn.style.fontSize = '12px';
+  inviteBtn.textContent = '+ Invite your agent';
+  inviteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    popupEl.classList.remove('open');
+    showAgentInvite();
+  });
+  popupEl.appendChild(inviteBtn);
 }
 
 function insertMention(name) {
@@ -741,6 +759,63 @@ function insertMention(name) {
   input.value = before + mention + after;
   input.selectionStart = input.selectionEnd = start + mention.length;
   input.focus();
+}
+
+async function showAgentInvite() {
+  const serverBase = SERVER.replace('wss://', 'https://').replace('ws://', 'http://');
+
+  // If we don't have an invite code (e.g. lobby), request one
+  if (!currentInviteCode && roomId) {
+    const res = await sendReq('rooms.createInvite', { roomId });
+    if (res.ok) currentInviteCode = res.payload.code;
+  }
+  if (!currentInviteCode) return;
+
+  const joinURL = serverBase + '/agent-join/' + currentInviteCode;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200;padding:24px;';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:440px;width:100%;';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'color:var(--terra-lt);font-size:15px;margin-bottom:12px;';
+  title.textContent = 'Invite your agent';
+
+  const desc = document.createElement('div');
+  desc.style.cssText = 'color:var(--text-dim);font-size:12px;line-height:1.6;margin-bottom:16px;';
+  desc.textContent = 'Tell your OpenClaw agent to visit this URL. Copy and paste this to your agent:';
+
+  const msgBox = document.createElement('div');
+  msgBox.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text);line-height:1.5;word-break:break-all;cursor:pointer;user-select:all;';
+  msgBox.textContent = 'Join this chat room: ' + joinURL;
+
+  const hint = document.createElement('div');
+  hint.style.cssText = 'color:var(--text-dim);font-size:11px;margin-top:8px;';
+  hint.textContent = 'Click to copy';
+
+  msgBox.addEventListener('click', () => {
+    navigator.clipboard.writeText(msgBox.textContent).then(() => {
+      hint.textContent = 'Copied!';
+      hint.style.color = 'var(--terra-lt)';
+      setTimeout(() => { hint.textContent = 'Click to copy'; hint.style.color = 'var(--text-dim)'; }, 2000);
+    });
+  });
+
+  const closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'margin-top:16px;padding:8px 20px;background:var(--terra);color:#fff;border:none;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;';
+  closeBtn.textContent = 'Done';
+  closeBtn.onclick = () => overlay.remove();
+
+  card.appendChild(title);
+  card.appendChild(desc);
+  card.appendChild(msgBox);
+  card.appendChild(hint);
+  card.appendChild(closeBtn);
+  overlay.appendChild(card);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 function esc(str) {

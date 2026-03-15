@@ -329,11 +329,18 @@ func (r *Router) handleRoomsCreateInvite(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
-	// Verify participant
-	ok, _ := r.DB.IsParticipant(roomID, client.UserID())
-	if !ok {
-		client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
-		return
+	// Verify participant (or subscribed guest)
+	if client.IsGuest() {
+		if !r.Hub.IsClientSubscribed(roomID, client) {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not in this room"))
+			return
+		}
+	} else {
+		ok, _ := r.DB.IsParticipant(roomID, client.UserID())
+		if !ok {
+			client.SendJSON(ws.NewErrorResponse(req.ID, "FORBIDDEN", "Not a participant"))
+			return
+		}
 	}
 
 	maxUses := jsonInt(req.Params["maxUses"])
@@ -346,7 +353,11 @@ func (r *Router) handleRoomsCreateInvite(client *ws.Client, req ws.RPCRequest) {
 		expiresIn = &d
 	}
 
-	invite, err := r.DB.CreateInvite(roomID, client.UserID(), expiresIn, maxUses)
+	createdBy := client.UserID()
+	if client.IsGuest() {
+		createdBy = "system"
+	}
+	invite, err := r.DB.CreateInvite(roomID, createdBy, expiresIn, maxUses)
 	if err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
 		return

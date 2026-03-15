@@ -392,6 +392,125 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 	})
 
+	// Agent join — GET returns instructions for the agent, POST registers the agent
+	http.HandleFunc("/agent-join/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		code := strings.TrimPrefix(r.URL.Path, "/agent-join/")
+		if code == "" {
+			http.Error(w, "missing invite code", http.StatusBadRequest)
+			return
+		}
+
+		invite, err := database.LookupInvite(strings.ToUpper(code))
+		if err != nil {
+			http.Error(w, "Invalid invite code: "+err.Error(), http.StatusNotFound)
+			return
+		}
+
+		room, err := database.GetRoom(invite.RoomID)
+		if err != nil {
+			http.Error(w, "Room not found", http.StatusInternalServerError)
+			return
+		}
+
+		if r.Method == http.MethodGet {
+			// Return plain-text instructions the agent can follow
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprintf(w, `You are joining the Claudio chat room "%s" %s.
+
+To complete joining, send an HTTP POST to:
+  https://%s/agent-join/%s
+
+With JSON body:
+  {"openclawUrl": "<YOUR_OPENCLAW_URL>", "openclawToken": "<YOUR_TOKEN>", "agentId": "<YOUR_AGENT_ID>", "agentName": "<YOUR_DISPLAY_NAME>", "agentEmoji": "<EMOJI>"}
+
+To find your OpenClaw URL and token, run this command:
+  cat ~/.openclaw/openclaw.json
+
+Look for gateway.port (default 18789) and gateway.auth.token.
+Your public URL is typically your domain or tunnel URL (e.g. ngrok, tailscale).
+Your agent ID is in agents.list[].id (or "default" if not configured).
+
+Once registered, humans in the room can @mention you and you will receive and respond to messages.
+`, room.Name, room.Emoji, cfg.ExternalURL, code)
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			var req struct {
+				OpenclawURL   string `json:"openclawUrl"`
+				OpenclawToken string `json:"openclawToken"`
+				AgentID       string `json:"agentId"`
+				AgentName     string `json:"agentName"`
+				AgentEmoji    string `json:"agentEmoji"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+				return
+			}
+
+			if req.OpenclawURL == "" || req.AgentID == "" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "openclawUrl and agentId are required"})
+				return
+			}
+
+			if req.AgentName == "" {
+				req.AgentName = req.AgentID
+			}
+
+			// Verify we can actually connect to this OpenClaw server
+			testClient, err := router.OpenClawPool.Get(req.OpenclawURL, req.OpenclawToken)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadGateway)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Could not connect to your OpenClaw server: " + err.Error()})
+				return
+			}
+			_ = testClient
+
+			// Add agent to room
+			if err := database.AddAgentParticipant(room.ID, req.AgentID, req.OpenclawURL, req.OpenclawToken, req.AgentID, req.AgentName, req.AgentEmoji); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to add agent: " + err.Error()})
+				return
+			}
+
+			// Broadcast join event
+			hub.BroadcastToRoom(room.ID, ws.NewEvent("room.join", map[string]interface{}{
+				"roomId":      room.ID,
+				"displayName": req.AgentName,
+				"emoji":       req.AgentEmoji,
+				"isAgent":     true,
+			}), nil)
+
+			slog.Info("agent joined via relay", "agent", req.AgentName, "room", room.Name, "openclawUrl", req.OpenclawURL)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"roomName": room.Name,
+				"roomId":   room.ID,
+				"message":  fmt.Sprintf("You have joined room \"%s\". Humans in the room can now @mention you to chat.", room.Name),
+			})
+			return
+		}
+
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)
 	if err := http.ListenAndServe(cfg.ListenAddr, nil); err != nil {
 		slog.Error("server failed", "err", err)
