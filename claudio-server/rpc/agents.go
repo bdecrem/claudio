@@ -40,6 +40,10 @@ func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 		if !mentionSet[p.ID] {
 			continue
 		}
+		// Skip chat-api agents — they poll for messages via HTTP, not via OpenClaw WS
+		if p.OpenclawURL == "" {
+			continue
+		}
 
 		slog.Info("dispatching to agent", "agent", p.DisplayName, "agentId", p.AgentID, "roomId", roomID)
 

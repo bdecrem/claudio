@@ -371,8 +371,9 @@ const msgInput = document.getElementById('msg-input');
 const sendBtn = document.getElementById('send-btn');
 const typingEl = document.getElementById('typing');
 
-// Restore name from localStorage
+// Restore name and last invite code from localStorage
 nameInput.value = localStorage.getItem('claudio-name') || '';
+codeInput.value = localStorage.getItem('claudio-code') || '';
 
 // --- Join Flow ---
 joinBtn.onclick = () => startJoin();
@@ -387,6 +388,7 @@ function startJoin() {
   const parsed = parseCodeInput(codeInput.value);
   SERVER = parsed.serverURL;
   localStorage.setItem('claudio-name', name);
+  localStorage.setItem('claudio-code', codeInput.value.trim());
   joinBtn.disabled = true;
   joinError.textContent = 'Connecting...';
   connect(name, parsed.inviteCode);

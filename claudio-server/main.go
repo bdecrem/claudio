@@ -622,8 +622,23 @@ Once registered, humans in the room can @mention you and you will receive and re
 				return
 			}
 
+			// Register as participant on first message (idempotent)
+			agentID := "chatapi-" + req.Name
+			err = database.AddAgentParticipant(roomID, agentID, "", "", "", req.Name, req.Emoji)
+			if err == nil {
+				// First time — broadcast join event
+				hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+					"roomId":      roomID,
+					"displayName": req.Name,
+					"emoji":       req.Emoji,
+					"isAgent":     true,
+				}), nil)
+			}
+			// err != nil means already exists (INSERT OR IGNORE), which is fine
+
 			msgID := rpc.GenerateMsgID()
-			msg, err := database.InsertMessage(msgID, roomID, nil, nil, req.Name, req.Emoji, req.Content, "[]", nil)
+			senderAgentID := agentID
+			msg, err := database.InsertMessage(msgID, roomID, nil, &senderAgentID, req.Name, req.Emoji, req.Content, "[]", nil)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
