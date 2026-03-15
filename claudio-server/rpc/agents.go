@@ -10,9 +10,8 @@ import (
 	"github.com/nicebartender/claudio-server/ws"
 )
 
-// dispatchAgentResponses sends every human message to all agents in the room.
-// Agents that are @mentioned respond immediately. All other agents also see the
-// message so they can participate in the conversation naturally.
+// dispatchAgentResponses sends a human message to @mentioned agents in the room.
+// Only agents explicitly mentioned with @Name are called.
 func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 	// Skip messages from agents (prevent loops)
 	if msg.SenderAgentID != nil {
@@ -24,8 +23,21 @@ func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 		return
 	}
 
+	// Parse which participant IDs were mentioned
+	mentionedIDs := ParseMentions(msg.Content, participants)
+	if len(mentionedIDs) == 0 {
+		return
+	}
+	mentionSet := make(map[string]bool, len(mentionedIDs))
+	for _, id := range mentionedIDs {
+		mentionSet[id] = true
+	}
+
 	for _, p := range participants {
 		if !p.IsAgent {
+			continue
+		}
+		if !mentionSet[p.ID] {
 			continue
 		}
 
@@ -36,11 +48,11 @@ func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 			"displayName": p.DisplayName,
 		}), nil)
 
-		go r.callAgent(roomID, p)
+		go r.callAgent(roomID, msg, p)
 	}
 }
 
-func (r *Router) callAgent(roomID string, agent db.Participant) {
+func (r *Router) callAgent(roomID string, msg *db.Message, agent db.Participant) {
 	client, err := r.OpenClawPool.Get(agent.OpenclawURL, agent.OpenclawToken)
 	if err != nil {
 		slog.Error("callAgent: pool connect failed", "err", err, "url", agent.OpenclawURL)
@@ -53,13 +65,14 @@ func (r *Router) callAgent(roomID string, agent db.Participant) {
 	if ocAgentID == "" {
 		ocAgentID = agent.AgentID
 	}
-	// Session key format: agent:{roomId}:{openclawAgentId}
-	// This gives each room its own conversation thread on the OpenClaw side
-	sessionKey := "agent:" + roomID + ":" + ocAgentID
+	// Session key format: agent:{agentId}:{scope}
+	// OpenClaw routes to the agent by the second segment and uses the third as scope.
+	// Using roomID as scope gives each room its own conversation thread.
+	sessionKey := "agent:" + ocAgentID + ":" + roomID
 
-	// Get recent history to include as context in the message
-	messages, _ := r.DB.GetMessages(roomID, nil, 10)
-	contextMsg := buildContextMessage(messages, agent.DisplayName)
+	// Send just the triggering message with sender attribution.
+	// OpenClaw maintains session history, so we don't need to resend old messages.
+	contextMsg := fmt.Sprintf("[%s]: %s", msg.SenderDisplayName, msg.Content)
 
 	resp, err := client.ChatSend(sessionKey, contextMsg)
 	if err != nil {
@@ -71,21 +84,6 @@ func (r *Router) callAgent(roomID string, agent db.Participant) {
 	if resp.Text != "" {
 		r.postAgentMessage(roomID, agent, resp.Text)
 	}
-}
-
-func buildContextMessage(messages []db.Message, agentName string) string {
-	if len(messages) == 0 {
-		return "Hello"
-	}
-	// Build context from recent messages so the agent knows who said what.
-	// Messages come newest-first from DB, reverse for chronological order.
-	var lines []string
-	for i := len(messages) - 1; i >= 0; i-- {
-		m := messages[i]
-		name := m.SenderDisplayName
-		lines = append(lines, fmt.Sprintf("[%s]: %s", name, m.Content))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func (r *Router) postAgentMessage(roomID string, agent db.Participant, content string) {
