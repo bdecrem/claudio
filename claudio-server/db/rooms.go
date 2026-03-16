@@ -315,6 +315,28 @@ func (db *DB) GetParticipantRole(roomID, userID string) (string, error) {
 	return role, err
 }
 
+// UpgradeAgentCredentials updates an existing chat-api agent participant with
+// OpenClaw credentials so the server can call the agent via WebSocket on @mentions.
+// If oldAgentID differs from newAgentID, the agent_id is also updated.
+func (db *DB) UpgradeAgentCredentials(roomID, oldAgentID, newAgentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji string) error {
+	result, err := db.Exec(`
+		UPDATE participants
+		SET agent_id = ?, openclaw_url = ?, openclaw_token = ?, openclaw_agent_id = ?,
+		    agent_name = ?, agent_emoji = ?
+		WHERE room_id = ? AND agent_id = ?
+	`, newAgentID, openclawURL, openclawToken, openclawAgentID,
+		agentName, agentEmoji, roomID, oldAgentID)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		// No existing chat-api participant — insert fresh with full credentials
+		return db.AddAgentParticipant(roomID, newAgentID, openclawURL, openclawToken, openclawAgentID, agentName, agentEmoji)
+	}
+	return nil
+}
+
 func deref(s *string) string {
 	if s == nil {
 		return ""

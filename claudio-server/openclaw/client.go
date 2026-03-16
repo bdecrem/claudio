@@ -86,11 +86,15 @@ func (c *Client) IsConnected() bool {
 
 func (c *Client) Connect() error {
 	url := c.url
+	scheme := "wss://"
+	if strings.HasPrefix(url, "ws://") || strings.HasPrefix(url, "http://") {
+		scheme = "ws://"
+	}
 	for _, prefix := range []string{"wss://", "ws://", "https://", "http://"} {
 		url = strings.TrimPrefix(url, prefix)
 	}
 	url = strings.TrimSuffix(url, "/")
-	wsURL := "wss://" + url
+	wsURL := scheme + url
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {

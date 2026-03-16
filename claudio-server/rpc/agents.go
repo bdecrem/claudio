@@ -1,14 +1,20 @@
 package rpc
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/nicebartender/claudio-server/db"
 	"github.com/nicebartender/claudio-server/ws"
 )
+
+var httpClient = &http.Client{Timeout: 120 * time.Second}
 
 // dispatchAgentResponses sends a human message to @mentioned agents in the room.
 // Only agents explicitly mentioned with @Name are called.
@@ -56,37 +62,75 @@ func (r *Router) dispatchAgentResponses(roomID string, msg *db.Message) {
 	}
 }
 
-func (r *Router) callAgent(roomID string, msg *db.Message, agent db.Participant) {
-	client, err := r.OpenClawPool.Get(agent.OpenclawURL, agent.OpenclawToken)
-	if err != nil {
-		slog.Error("callAgent: pool connect failed", "err", err, "url", agent.OpenclawURL)
-		r.postAgentError(roomID, agent, fmt.Sprintf("Failed to connect: %s", err.Error()))
-		return
-	}
+// OpenclawHTTPURL converts a WebSocket or HTTP OpenClaw URL to an HTTP base URL.
+func OpenclawHTTPURL(raw string) string {
+	u := raw
+	u = strings.Replace(u, "wss://", "https://", 1)
+	u = strings.Replace(u, "ws://", "http://", 1)
+	u = strings.TrimSuffix(u, "/")
+	return u
+}
 
+func (r *Router) callAgent(roomID string, msg *db.Message, agent db.Participant) {
 	// Use the OpenClaw agent ID if set, otherwise fall back to our agent ID
 	ocAgentID := agent.OpenclawAgentID
 	if ocAgentID == "" {
 		ocAgentID = agent.AgentID
 	}
-	// Session key format: agent:{agentId}:{scope}
-	// OpenClaw routes to the agent by the second segment and uses the third as scope.
-	// Using roomID as scope gives each room its own conversation thread.
+	// Session key scoped per room so each room gets its own conversation thread.
 	sessionKey := "agent:" + ocAgentID + ":" + roomID
 
-	// Send just the triggering message with sender attribution.
-	// OpenClaw maintains session history, so we don't need to resend old messages.
 	contextMsg := fmt.Sprintf("[%s]: %s", msg.SenderDisplayName, msg.Content)
 
-	resp, err := client.ChatSend(sessionKey, contextMsg)
+	// Use OpenClaw's OpenAI-compatible HTTP REST API — no pairing required.
+	baseURL := OpenclawHTTPURL(agent.OpenclawURL)
+	body, _ := json.Marshal(map[string]interface{}{
+		"model": "default",
+		"user":  sessionKey,
+		"messages": []map[string]string{
+			{"role": "user", "content": contextMsg},
+		},
+	})
+
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		slog.Error("callAgent: chat.send failed", "err", err, "agent", agent.DisplayName)
+		slog.Error("callAgent: build request failed", "err", err)
 		r.postAgentError(roomID, agent, err.Error())
 		return
 	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+agent.OpenclawToken)
 
-	if resp.Text != "" {
-		r.postAgentMessage(roomID, agent, resp.Text)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		slog.Error("callAgent: HTTP request failed", "err", err, "url", baseURL)
+		r.postAgentError(roomID, agent, err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		slog.Error("callAgent: OpenClaw returned error", "status", resp.StatusCode, "body", string(respBody))
+		r.postAgentError(roomID, agent, fmt.Sprintf("OpenClaw returned %d", resp.StatusCode))
+		return
+	}
+
+	// Parse OpenAI-compatible response
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		slog.Error("callAgent: parse response failed", "err", err)
+		return
+	}
+
+	if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
+		r.postAgentMessage(roomID, agent, result.Choices[0].Message.Content)
 	}
 }
 

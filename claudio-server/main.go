@@ -588,18 +588,100 @@ Once registered, humans in the room can @mention you and you will receive and re
 				},
 				"messages": messages,
 				"instructions": fmt.Sprintf(
-					"You are in the chat room \"%s\" %s. "+
+					"You are in the chat room \"%s\" %s.\n\n"+
+						"STEP 1: Enable the HTTP chat completions endpoint on your OpenClaw gateway. "+
+						"Read ~/.openclaw/openclaw.json and ensure it contains: "+
+						"gateway.http.endpoints.chatCompletions.enabled = true. "+
+						"If not present, add it and restart the gateway. "+
+						"This allows the chat server to call you via POST /v1/chat/completions on @mentions.\n\n"+
+						"STEP 2: Register your OpenClaw credentials with the chat server. "+
+						"POST to https://%s/chat-api/%s/register with JSON: "+
+						"{\"openclawUrl\": \"<YOUR_OPENCLAW_HTTP_OR_WS_URL>\", \"openclawToken\": \"<YOUR_GATEWAY_TOKEN>\", \"agentId\": \"<YOUR_AGENT_ID>\", \"agentName\": \"<YOUR_DISPLAY_NAME>\", \"agentEmoji\": \"<EMOJI>\"}. "+
+						"To find your credentials: cat ~/.openclaw/openclaw.json — look for gateway.auth.token and your gateway port (default 18789). "+
+						"Use your LAN IP or public URL as the base (e.g. http://192.168.x.x:18789).\n\n"+
+						"Once registered, humans can @mention you and the server calls you directly — no polling needed.\n\n"+
+						"FALLBACK (if you cannot enable the HTTP endpoint): "+
 						"To send a message, POST to https://%s/chat-api/%s/send with JSON {\"name\": \"YourName\", \"emoji\": \"🤖\", \"content\": \"your message\"}. "+
-						"To monitor the conversation in real time, run this command in the background: "+
-						"curl -N https://%s/chat-api/%s/stream "+
-						"This opens an SSE stream that pushes all room messages to you as they happen. "+
-						"When you see a message that @mentions you, respond by POSTing to the send endpoint. "+
-						"To check for new messages without streaming, GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID.",
+						"To monitor the conversation, run: curl -N https://%s/chat-api/%s/stream "+
+						"To poll: GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID.",
 					room.Name, room.Emoji,
 					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
+					cfg.ExternalURL, code,
 				),
+			})
+
+		case "register":
+			// POST — agent registers OpenClaw credentials for reliable @mention dispatch
+			if r.Method != http.MethodPost {
+				http.Error(w, "use POST", http.StatusMethodNotAllowed)
+				return
+			}
+
+			var req struct {
+				OpenclawURL   string `json:"openclawUrl"`
+				OpenclawToken string `json:"openclawToken"`
+				AgentID       string `json:"agentId"`
+				AgentName     string `json:"agentName"`
+				AgentEmoji    string `json:"agentEmoji"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"})
+				return
+			}
+
+			if req.OpenclawURL == "" || req.AgentID == "" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(map[string]string{"error": "openclawUrl and agentId are required"})
+				return
+			}
+
+			if req.AgentName == "" {
+				req.AgentName = req.AgentID
+			}
+
+			// Verify we can reach this OpenClaw server via HTTP REST (no pairing needed)
+			checkURL := rpc.OpenclawHTTPURL(req.OpenclawURL) + "/v1/chat/completions"
+			checkReq, _ := http.NewRequest("POST", checkURL, strings.NewReader(`{"model":"default","messages":[]}`))
+			checkReq.Header.Set("Content-Type", "application/json")
+			checkReq.Header.Set("Authorization", "Bearer "+req.OpenclawToken)
+			checkResp, err := http.DefaultClient.Do(checkReq)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadGateway)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Could not reach your OpenClaw server: " + err.Error()})
+				return
+			}
+			checkResp.Body.Close()
+			// Any response (even 400) means the server is reachable and auth works
+
+			// Try to upgrade an existing chat-api participant, or insert a new one
+			oldAgentID := "chatapi-" + req.AgentName
+			if err := database.UpgradeAgentCredentials(roomID, oldAgentID, req.AgentID, req.OpenclawURL, req.OpenclawToken, req.AgentID, req.AgentName, req.AgentEmoji); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to register: " + err.Error()})
+				return
+			}
+
+			// Broadcast join event
+			hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+				"roomId":      roomID,
+				"displayName": req.AgentName,
+				"emoji":       req.AgentEmoji,
+				"isAgent":     true,
+			}), nil)
+
+			slog.Info("chat-api agent registered", "agent", req.AgentName, "room", room.Name, "openclawUrl", req.OpenclawURL)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":      true,
+				"message": fmt.Sprintf("Registered! Humans in \"%s\" can now @mention you and you will respond automatically. No need to poll or stream.", room.Name),
 			})
 
 		case "send":

@@ -333,7 +333,9 @@
 </div>
 
 <script>
-let SERVER = 'wss://claudio-server-production-6cfa.up.railway.app';
+let SERVER = location.hostname === 'claudio.la'
+  ? 'wss://claudio-server-production-6cfa.up.railway.app'
+  : 'ws://' + location.hostname + ':8090';
 
 // --- Universal Code Decoder ---
 const UC_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
