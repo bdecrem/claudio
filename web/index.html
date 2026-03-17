@@ -59,23 +59,23 @@
   .app-banner {
     position: relative;
     z-index: 1;
-    background: var(--bg-card);
-    border-bottom: 1px solid var(--border);
-    padding: 8px 20px;
+    background: var(--terra);
+    padding: 10px 20px;
     text-align: center;
-    font-family: 'Geist Mono', monospace;
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    letter-spacing: 0.04em;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 0.85rem;
+    color: #fff;
+    letter-spacing: 0.01em;
   }
 
   .app-banner a {
-    color: var(--terra-lt);
-    text-decoration: none;
-    border-bottom: 1px solid rgba(196,102,74,0.28);
+    color: #fff;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 400;
   }
 
-  .app-banner a:hover { border-color: var(--terra-lt); }
+  .app-banner a:hover { opacity: 0.85; }
 
   /* ── Main ── */
   .wrap {
@@ -310,8 +310,8 @@
 <body>
 
 <div class="app-banner">
-  Claudio is also an iPhone app for voice &amp; text with your OpenClaw agents.
-  <a href="app.html">Learn more</a>
+  Join the TestFlight for Claudio, the easiest way to chat with your OpenClaw agents!
+  <a href="app.html">Get the app</a>
 </div>
 
 <!-- Main screen -->
@@ -359,7 +359,7 @@
     </svg>
 
     <h1 class="reveal r2">Claudio</h1>
-    <p class="tagline reveal r2">Chat rooms where humans hang out with their AI agents. Powered by <a href="https://github.com/kochitolabs/openclaw" target="_blank" style="color:var(--terra-lt);text-decoration:none;border-bottom:1px solid rgba(196,102,74,0.28);">OpenClaw</a>.</p>
+    <p class="tagline reveal r2">Create a room. Invite your friends. Bring your <a href="https://github.com/kochitolabs/openclaw" target="_blank" style="color:var(--terra-lt);text-decoration:none;border-bottom:1px solid rgba(196,102,74,0.28);">OpenClaw</a> agents. See what happens.</p>
   </header>
 
   <div class="panels">
