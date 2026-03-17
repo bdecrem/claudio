@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudio — Voice & Text for OpenClaw</title>
+<link rel="icon" type="image/svg+xml" href="../icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Geist+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f0c0a;
+    --bg-card:  #161210;
+    --terra:    #c4664a;
+    --terra-lt: #d4866a;
+    --gold:     #c4a45a;
+    --muted:    #6b5c52;
+    --text:     #d4c4bc;
+    --text-dim: #7a6a62;
+    --border:   rgba(196,102,74,0.14);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Fraunces', Georgia, serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 64px 0 48px;
+    text-align: center;
+  }
+
+  .mascot {
+    display: block;
+    margin: 0 auto 32px;
+    width: 148px;
+    height: 148px;
+    animation: idle 4s ease-in-out infinite;
+  }
+
+  @keyframes idle {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+  }
+
+  h1 {
+    font-size: clamp(2.8rem, 8vw, 4.2rem);
+    font-weight: 300;
+    font-style: italic;
+    color: var(--terra-lt);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+
+  .eyebrow {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+
+  /* ── Hero copy ── */
+  .hero-copy {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .hero-copy p.lead {
+    font-size: 1.15rem;
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 14px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .hero-copy p.sub {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Screenshot ── */
+  .screenshot {
+    margin-bottom: 52px;
+    text-align: center;
+  }
+
+  .screenshot img {
+    max-width: 280px;
+    width: 100%;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Spec bullets ── */
+  .specs {
+    border-top: 1px solid var(--border);
+    padding: 32px 0 40px;
+    margin-bottom: 40px;
+  }
+
+  .spec-bullets {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .spec-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: 300;
+  }
+
+  .spec-item::before {
+    content: '·';
+    color: var(--terra);
+    font-size: 1.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .spec-item a {
+    color: var(--terra-lt);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(196,102,74,0.28);
+    transition: border-color 0.2s;
+  }
+
+  .spec-item a:hover { border-color: var(--terra-lt); }
+
+  .spec-item .dim {
+    color: var(--text-dim);
+  }
+
+  /* ── CTA ── */
+  .cta-block {
+    text-align: center;
+    padding: 0 0 52px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 12px 30px;
+    border-radius: 8px;
+    font-family: 'Fraunces', serif;
+    font-size: 0.93rem;
+    font-weight: 400;
+    text-decoration: none;
+    transition: all 0.2s;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-primary {
+    background: var(--terra);
+    color: #1a0f0a;
+    border: 1.5px solid var(--terra);
+  }
+
+  .btn-primary:hover {
+    background: var(--terra-lt);
+    border-color: var(--terra-lt);
+    transform: translateY(-1px);
+  }
+
+  .cta-note {
+    margin-top: 14px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .cta-note a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(107,92,82,0.35);
+  }
+
+  .cta-note a:hover { color: var(--text-dim); }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  footer a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+  footer a:hover { color: var(--muted); }
+  footer .links { display: flex; gap: 18px; }
+
+  /* ── Reveals ── */
+  .reveal { opacity: 0; transform: translateY(16px); animation: reveal 0.65s ease forwards; }
+  .r1 { animation-delay: 0.05s; }
+  .r2 { animation-delay: 0.15s; }
+  .r3 { animation-delay: 0.25s; }
+  .r4 { animation-delay: 0.35s; }
+  .r5 { animation-delay: 0.45s; }
+  .r6 { animation-delay: 0.55s; }
+
+  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 480px) {
+    footer { flex-direction: column; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <svg class="mascot reveal r1" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="ib" cx="35%" cy="28%" r="68%">
+            <stop offset="0%" stop-color="#EAB090"/>
+            <stop offset="35%" stop-color="#C86040"/>
+            <stop offset="70%" stop-color="#9A3820"/>
+            <stop offset="100%" stop-color="#621808"/>
+          </radialGradient>
+          <radialGradient id="ie" cx="45%" cy="35%" r="60%">
+            <stop offset="0%" stop-color="#2A1008"/>
+            <stop offset="100%" stop-color="#120604"/>
+          </radialGradient>
+          <radialGradient id="ispec" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="white" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="white" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="ileg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9A3820"/>
+            <stop offset="100%" stop-color="#621808"/>
+          </linearGradient>
+        </defs>
+        <!-- Antennae -->
+        <path d="M 51 30 C 50 22 45 14 47 8" stroke="#C05A3C" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="47" cy="7" r="2.8" fill="#D4856A"/>
+        <path d="M 69 30 C 70 22 75 14 73 8" stroke="#C05A3C" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <circle cx="73" cy="7" r="2.8" fill="#D4856A"/>
+        <!-- Arms -->
+        <ellipse cx="20" cy="62" rx="12" ry="10" fill="#9A3820"/>
+        <ellipse cx="100" cy="62" rx="12" ry="10" fill="#9A3820"/>
+        <!-- Legs -->
+        <rect x="43" y="88" width="12" height="20" rx="5" fill="url(#ileg)"/>
+        <rect x="65" y="88" width="12" height="20" rx="5" fill="url(#ileg)"/>
+        <!-- Body -->
+        <circle cx="60" cy="58" r="42" fill="url(#ib)"/>
+        <!-- Specular -->
+        <ellipse cx="44" cy="38" rx="18" ry="12" fill="url(#ispec)" transform="rotate(-20 44 38)"/>
+        <!-- Eyes -->
+        <circle cx="48" cy="57" r="12" fill="url(#ie)"/>
+        <circle cx="72" cy="57" r="12" fill="url(#ie)"/>
+        <circle cx="51.5" cy="53" r="4" fill="#FFD060" opacity="0.95"/>
+        <circle cx="75.5" cy="53" r="4" fill="#FFD060" opacity="0.95"/>
+        <!-- Mic badge -->
+        <circle cx="91" cy="85" r="12" fill="#0E0604" opacity="0.85"/>
+        <rect x="88.5" y="77" width="5" height="8.5" rx="2.5" fill="white"/>
+        <path d="M 86 83 Q 86 89.5 91 89.5 Q 96 89.5 96 83" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <line x1="91" y1="89.5" x2="91" y2="92" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+
+    <h1 class="reveal r2">Claudio</h1>
+    <p class="eyebrow reveal r2">Voice &amp; Text · OpenClaw Client</p>
+  </header>
+
+  <div class="hero-copy">
+    <p class="lead reveal r3">
+      A minimal iPhone client for talking to your OpenClaw agents —
+      by voice or by text. Full conversation context maintained.
+    </p>
+    <p class="sub reveal r3">v0.1 · simple and made with care · no accounts · no data collection</p>
+  </div>
+
+  <!-- Screenshot -->
+  <div class="screenshot reveal r4">
+    <img src="chat-2.png" alt="Claudio chat screenshot">
+  </div>
+
+  <!-- Spec bullets -->
+  <div class="specs reveal r5">
+    <div class="spec-bullets">
+      <div class="spec-item">Apple Speech for STT, server-side TTS <span class="dim">— voice is enhancement, not requirement</span></div>
+      <div class="spec-item">Self-hosted <a href="https://github.com/kochitolabs/openclaw" target="_blank">OpenClaw</a> backend via OpenAI-compatible API</div>
+      <div class="spec-item">No credentials stored on device <span class="dim">— server URL only</span></div>
+      <div class="spec-item">iOS 17+ <span class="dim">— requires your own OpenClaw instance</span></div>
+      <div class="spec-item">No data collected. No account. Conversations stay on your server.</div>
+      <div class="spec-item"><a href="https://github.com/bdecrem/claudio" target="_blank">Open source</a> <span class="dim">— MIT licensed</span></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block reveal r6">
+    <a class="btn btn-primary" href="mailto:hello@kochi.to">TestFlight Invite</a>
+    <p class="cta-note">Need help setting up or want to get involved? <a href="https://discord.gg/c3avyCvjz5">Join our Discord</a></p>
+  </div>
+
+  <footer class="reveal r6">
+    <span>&copy; 2025–2026 Kochito Labs</span>
+    <div class="links">
+      <a href="https://github.com/bdecrem/claudio" target="_blank">GitHub</a>
+      <a href="privacy.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+    </div>
+  </footer>
+
+</div>
+
+</body>
+</html>

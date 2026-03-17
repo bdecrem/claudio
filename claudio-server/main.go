@@ -1048,8 +1048,8 @@ Once registered, humans in the room can @mention you and you will receive and re
 				if evt.Event != "room.message" {
 					continue
 				}
-				// Skip messages from agents (prevent loops)
-				if evt.Payload.Message.SenderAgentID != nil {
+				// Skip messages from THIS agent (prevent self-loops)
+				if evt.Payload.Message.SenderAgentID != nil && *evt.Payload.Message.SenderAgentID == agentID {
 					continue
 				}
 				// Check for @mention

@@ -48,6 +48,11 @@ func (r *Router) handleRoomsCreate(client *ws.Client, req ws.RPCRequest) {
 		return
 	}
 
+	// Ensure guest users exist in the users table (needed for foreign key on created_by)
+	if client.IsGuest() {
+		r.DB.UpsertUser(client.UserID(), "guest", client.DisplayName(), "")
+	}
+
 	room, err := r.DB.CreateRoom(name, emoji, client.UserID(), isPublic)
 	if err != nil {
 		client.SendJSON(ws.NewErrorResponse(req.ID, "DB_ERROR", err.Error()))
