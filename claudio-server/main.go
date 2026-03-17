@@ -23,6 +23,90 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+// agentBridgeScript is a Node.js script that agents download and run.
+// It bridges a WebSocket connection to our server with the local OpenClaw HTTP API.
+const agentBridgeScript = `#!/usr/bin/env node
+// Claudio Agent Bridge — connects to a Claudio chat room and responds to @mentions
+// Usage: node agent-bridge.js <server-url> <invite-code> <agent-name> <agent-emoji> <agent-id> <openclaw-port> <openclaw-token>
+
+const WebSocket = require('ws');
+
+const [,, serverURL, inviteCode, agentName, agentEmoji, agentId, openclawPort, openclawToken] = process.argv;
+if (!serverURL || !inviteCode || !agentName || !openclawToken) {
+  console.error('Usage: node agent-bridge.js <server-url> <invite-code> <agent-name> <agent-emoji> <agent-id> <openclaw-port> <openclaw-token>');
+  process.exit(1);
+}
+
+const port = openclawPort || '18789';
+const wsScheme = serverURL.startsWith('https') ? 'wss' : 'ws';
+const wsURL = wsScheme + '://' + serverURL.replace(/^https?:\/\//, '') + '/agent-ws/' + inviteCode;
+
+function connect() {
+  console.log('Connecting to', wsURL);
+  const ws = new WebSocket(wsURL);
+
+  ws.on('open', () => {
+    console.log('Connected! Sending identity...');
+    ws.send(JSON.stringify({
+      type: 'identity',
+      agentName: agentName,
+      agentEmoji: agentEmoji || '',
+      agentId: agentId || agentName,
+      openclawUrl: 'http://localhost:' + port,
+      openclawToken: openclawToken
+    }));
+  });
+
+  ws.on('message', async (data) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'connected') {
+        console.log('Joined room:', msg.room);
+        return;
+      }
+      if (msg.type === 'mention') {
+        console.log('Mentioned by', msg.sender + ':', msg.content);
+        try {
+          const resp = await fetch('http://localhost:' + port + '/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + openclawToken
+            },
+            body: JSON.stringify({
+              model: 'default',
+              user: msg.sessionKey || 'agent:' + (agentId || agentName) + ':room',
+              messages: [{ role: 'user', content: '[' + msg.sender + ']: ' + msg.content }]
+            })
+          });
+          const result = await resp.json();
+          const content = result.choices?.[0]?.message?.content;
+          if (content) {
+            ws.send(JSON.stringify({ type: 'response', content: content }));
+            console.log('Responded:', content.substring(0, 80) + (content.length > 80 ? '...' : ''));
+          }
+        } catch (e) {
+          console.error('OpenClaw call failed:', e.message);
+        }
+      }
+    } catch (e) {
+      // ignore non-JSON
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('Disconnected. Reconnecting in 5s...');
+    setTimeout(connect, 5000);
+  });
+
+  ws.on('error', (e) => {
+    console.error('WebSocket error:', e.message);
+  });
+}
+
+connect();
+`
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
@@ -589,23 +673,22 @@ Once registered, humans in the room can @mention you and you will receive and re
 				"messages": messages,
 				"instructions": fmt.Sprintf(
 					"You are in the chat room \"%s\" %s.\n\n"+
+						"To join and respond to @mentions automatically, follow these steps:\n\n"+
 						"STEP 1: Enable the HTTP chat completions endpoint on your OpenClaw gateway. "+
 						"Read ~/.openclaw/openclaw.json and ensure it contains: "+
 						"gateway.http.endpoints.chatCompletions.enabled = true. "+
-						"If not present, add it and restart the gateway. "+
-						"This allows the chat server to call you via POST /v1/chat/completions on @mentions.\n\n"+
-						"STEP 2: Register your OpenClaw credentials with the chat server. "+
-						"POST to https://%s/chat-api/%s/register with JSON: "+
-						"{\"openclawUrl\": \"<YOUR_OPENCLAW_HTTP_OR_WS_URL>\", \"openclawToken\": \"<YOUR_GATEWAY_TOKEN>\", \"agentId\": \"<YOUR_AGENT_ID>\", \"agentName\": \"<YOUR_DISPLAY_NAME>\", \"agentEmoji\": \"<EMOJI>\"}. "+
-						"To find your credentials: cat ~/.openclaw/openclaw.json — look for gateway.auth.token and your gateway port (default 18789). "+
-						"Use your LAN IP or public URL as the base (e.g. http://192.168.x.x:18789).\n\n"+
-						"Once registered, humans can @mention you and the server calls you directly — no polling needed.\n\n"+
-						"FALLBACK (if you cannot enable the HTTP endpoint): "+
+						"If not present, add it and restart the gateway.\n\n"+
+						"STEP 2: Download and run the bridge script. "+
+						"First download it: curl -o /tmp/claudio-bridge.js https://%s/agent-bridge.js "+
+						"Then find your gateway token in ~/.openclaw/openclaw.json (gateway.auth.token) and your agent ID (agents.list[].id). "+
+						"Run: node /tmp/claudio-bridge.js %s %s YOUR_AGENT_NAME YOUR_EMOJI YOUR_AGENT_ID 18789 YOUR_GATEWAY_TOKEN "+
+						"Run this in the background. It connects outbound to the chat server (works behind any NAT/firewall), "+
+						"receives @mention notifications, calls your local OpenClaw to process them, and posts responses back automatically.\n\n"+
+						"FALLBACK (manual mode): "+
 						"To send a message, POST to https://%s/chat-api/%s/send with JSON {\"name\": \"YourName\", \"emoji\": \"🤖\", \"content\": \"your message\"}. "+
-						"To monitor the conversation, run: curl -N https://%s/chat-api/%s/stream "+
 						"To poll: GET https://%s/chat-api/%s/messages?after=LAST_MESSAGE_ID.",
 					room.Name, room.Emoji,
-					cfg.ExternalURL, code,
+					cfg.ExternalURL,
 					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
 					cfg.ExternalURL, code,
@@ -833,6 +916,184 @@ Once registered, humans in the room can @mention you and you will receive and re
 		default:
 			http.Error(w, "unknown action", http.StatusNotFound)
 		}
+	})
+
+	// Agent WebSocket bridge — agents connect here to receive @mention dispatch
+	http.HandleFunc("/agent-ws/", func(w http.ResponseWriter, r *http.Request) {
+		code := strings.TrimPrefix(r.URL.Path, "/agent-ws/")
+		if code == "" {
+			http.Error(w, "missing invite code", http.StatusBadRequest)
+			return
+		}
+
+		invite, err := database.LookupInvite(strings.ToUpper(code))
+		if err != nil {
+			http.Error(w, "Invalid invite code", http.StatusNotFound)
+			return
+		}
+		roomID := invite.RoomID
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			slog.Error("agent-ws upgrade failed", "err", err)
+			return
+		}
+		defer conn.Close()
+
+		// Wait for the agent to identify itself
+		var identity struct {
+			Type          string `json:"type"`
+			AgentName     string `json:"agentName"`
+			AgentEmoji    string `json:"agentEmoji"`
+			AgentID       string `json:"agentId"`
+			OpenclawURL   string `json:"openclawUrl"`
+			OpenclawToken string `json:"openclawToken"`
+		}
+		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		if err := conn.ReadJSON(&identity); err != nil {
+			slog.Error("agent-ws: no identity", "err", err)
+			return
+		}
+		conn.SetReadDeadline(time.Time{}) // clear deadline
+
+		if identity.AgentName == "" {
+			identity.AgentName = "Agent"
+		}
+		if identity.AgentID == "" {
+			identity.AgentID = "bridge-" + identity.AgentName
+		}
+
+		// Register as participant
+		agentID := identity.AgentID
+		database.AddAgentParticipant(roomID, agentID, "", "", "", identity.AgentName, identity.AgentEmoji)
+
+		room, _ := database.GetRoom(roomID)
+		roomName := "room"
+		if room != nil {
+			roomName = room.Name
+		}
+
+		// Broadcast join
+		hub.BroadcastToRoom(roomID, ws.NewEvent("room.join", map[string]interface{}{
+			"roomId":      roomID,
+			"displayName": identity.AgentName,
+			"emoji":       identity.AgentEmoji,
+			"isAgent":     true,
+		}), nil)
+
+		slog.Info("agent-ws connected", "agent", identity.AgentName, "room", roomName)
+
+		// Subscribe to room events via a RoomListener
+		listener := &ws.RoomListener{
+			RoomID: roomID,
+			Ch:     make(chan []byte, 50),
+		}
+		hub.AddRoomListener(listener)
+		defer hub.RemoveRoomListener(listener)
+
+		// Send welcome
+		conn.WriteJSON(map[string]interface{}{
+			"type":    "connected",
+			"roomId":  roomID,
+			"room":    roomName,
+			"message": "Connected! You will receive @mention notifications.",
+		})
+
+		// Read responses from agent in a goroutine
+		agentResponses := make(chan string, 10)
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for {
+				var msg struct {
+					Type    string `json:"type"`
+					Content string `json:"content"`
+				}
+				if err := conn.ReadJSON(&msg); err != nil {
+					return
+				}
+				if msg.Type == "response" && msg.Content != "" {
+					agentResponses <- msg.Content
+				}
+			}
+		}()
+
+		// Main loop: forward @mentions to agent, post responses to room
+		for {
+			select {
+			case <-done:
+				slog.Info("agent-ws disconnected", "agent", identity.AgentName, "room", roomName)
+				hub.BroadcastToRoom(roomID, ws.NewEvent("room.leave", map[string]interface{}{
+					"roomId":      roomID,
+					"displayName": identity.AgentName,
+				}), nil)
+				return
+
+			case data := <-listener.Ch:
+				// Parse the room event to check for @mentions
+				var evt struct {
+					Event   string `json:"event"`
+					Payload struct {
+						RoomID  string `json:"roomId"`
+						Message struct {
+							SenderAgentID      *string `json:"senderAgentId"`
+							SenderDisplayName  string  `json:"senderDisplayName"`
+							Content            string  `json:"content"`
+						} `json:"message"`
+					} `json:"payload"`
+				}
+				if err := json.Unmarshal(data, &evt); err != nil {
+					continue
+				}
+				if evt.Event != "room.message" {
+					continue
+				}
+				// Skip messages from agents (prevent loops)
+				if evt.Payload.Message.SenderAgentID != nil {
+					continue
+				}
+				// Check for @mention
+				mention := "@" + strings.ToLower(identity.AgentName)
+				if !strings.Contains(strings.ToLower(evt.Payload.Message.Content), mention) {
+					continue
+				}
+
+				// Send mention to agent
+				conn.WriteJSON(map[string]interface{}{
+					"type":       "mention",
+					"sender":     evt.Payload.Message.SenderDisplayName,
+					"content":    evt.Payload.Message.Content,
+					"sessionKey": "agent:" + identity.AgentID + ":" + roomID,
+				})
+
+				// Send typing indicator
+				hub.BroadcastToRoom(roomID, ws.NewEvent("room.typing", map[string]interface{}{
+					"roomId":      roomID,
+					"displayName": identity.AgentName,
+				}), nil)
+
+			case content := <-agentResponses:
+				// Post agent response to room
+				msgID := rpc.GenerateMsgID()
+				msg, err := database.InsertMessage(msgID, roomID, nil, &agentID, identity.AgentName, identity.AgentEmoji, content, "[]", nil)
+				if err != nil {
+					slog.Error("agent-ws: insert failed", "err", err)
+					continue
+				}
+				hub.BroadcastToRoom(roomID, ws.NewEvent("room.message", map[string]interface{}{
+					"roomId":  roomID,
+					"message": msg,
+				}), nil)
+				slog.Info("agent-ws response posted", "agent", identity.AgentName, "room", roomName, "len", len(content))
+			}
+		}
+	})
+
+	// Serve the bridge script that agents download and run
+	http.HandleFunc("/agent-bridge.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		fmt.Fprint(w, agentBridgeScript)
 	})
 
 	slog.Info("claudio-server starting", "addr", cfg.ListenAddr)
